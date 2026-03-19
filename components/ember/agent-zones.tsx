@@ -18,6 +18,13 @@ const agents = [
     connections: 8,
   },
   {
+    name: "Вижн",
+    icon: Sparkles,
+    color: "#EC4899",
+    abilities: ["Распознавать", "Описывать", "Анализировать"],
+    connections: 5,
+  },
+  {
     name: "Календарь",
     icon: Cpu,
     color: "#10B981",
@@ -69,29 +76,31 @@ export function AgentZones() {
         {/* Main visualization - Agents connected in a row */}
         <div className="relative max-w-5xl mx-auto mb-16">
           {/* Connection lines SVG - positioned behind cards */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 200" preserveAspectRatio="xMidYMid meet">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 200" preserveAspectRatio="none">
             {/* Main horizontal line */}
             <line x1="100" y1="100" x2="900" y2="100" stroke="#BFFF00" strokeWidth="2" opacity="0.3" />
             
             {/* Lines to each agent card */}
-            <line x1="150" y1="100" x2="150" y2="50" stroke="#3B82F6" strokeWidth="2" strokeDasharray="4 4" />
-            <line x1="400" y1="100" x2="400" y2="50" stroke="#8B5CF6" strokeWidth="2" strokeDasharray="4 4" />
-            <line x1="650" y1="100" x2="650" y2="50" stroke="#10B981" strokeWidth="2" strokeDasharray="4 4" />
+            <line x1="100" y1="100" x2="100" y2="50" stroke="#3B82F6" strokeWidth="2" strokeDasharray="4 4" />
+            <line x1="300" y1="100" x2="300" y2="50" stroke="#8B5CF6" strokeWidth="2" strokeDasharray="4 4" />
+            <line x1="500" y1="100" x2="500" y2="50" stroke="#EC4899" strokeWidth="2" strokeDasharray="4 4" />
+            <line x1="700" y1="100" x2="700" y2="50" stroke="#10B981" strokeWidth="2" strokeDasharray="4 4" />
             <line x1="900" y1="100" x2="900" y2="50" stroke="#F59E0B" strokeWidth="2" strokeDasharray="4 4" />
 
             {/* Connection dots */}
-            <circle cx="150" cy="100" r="6" fill="#3B82F6" />
-            <circle cx="400" cy="100" r="6" fill="#8B5CF6" />
-            <circle cx="650" cy="100" r="6" fill="#10B981" />
+            <circle cx="100" cy="100" r="6" fill="#3B82F6" />
+            <circle cx="300" cy="100" r="6" fill="#8B5CF6" />
+            <circle cx="500" cy="100" r="6" fill="#EC4899" />
+            <circle cx="700" cy="100" r="6" fill="#10B981" />
             <circle cx="900" cy="100" r="6" fill="#F59E0B" />
           </svg>
 
           {/* Agent cards in a horizontal row */}
-          <div className="flex justify-between items-start gap-4 pt-16">
+          <div className="grid grid-cols-5 gap-4 pt-16 items-stretch">
             {agents.map((agent, i) => (
               <div 
                 key={agent.name}
-                className="relative flex-1 max-w-[220px]"
+                className="relative w-full"
               >
                 {/* Connection line going down */}
                 <div 
@@ -100,28 +109,26 @@ export function AgentZones() {
                 />
                 
                 {/* Agent card */}
-                <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20 hover:bg-white/15 transition-all group">
+                <div className="bg-[#0028B8] backdrop-blur-xl rounded-2xl p-5 border border-white/20 hover:bg-[#0020A0] transition-all group h-full flex flex-col shadow-lg">
                   {/* Agent icon */}
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3 mb-4">
                     <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: `${agent.color}30` }}
+                      className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-white/10"
                     >
-                      <agent.icon className="w-5 h-5" style={{ color: agent.color }} />
+                      <agent.icon className="w-6 h-6" style={{ color: agent.color }} />
                     </div>
                     <div>
-                      <span className="text-white font-bold text-sm block">{agent.name}</span>
-                      <span className="text-white/40 text-xs">{agent.connections} связей</span>
+                      <span className="text-white font-bold text-base block leading-tight">{agent.name}</span>
+                      <span className="text-white/60 text-xs mt-1 block">{agent.connections} связей</span>
                     </div>
                   </div>
 
                   {/* Abilities */}
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-col gap-2 flex-1">
                     {agent.abilities.map((ability) => (
                       <span 
                         key={ability}
-                        className="text-[10px] px-2 py-1 rounded-full text-white/70"
-                        style={{ backgroundColor: `${agent.color}20` }}
+                        className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-white/5 border border-white/5"
                       >
                         {ability}
                       </span>
@@ -130,7 +137,7 @@ export function AgentZones() {
 
                   {/* Bottom line indicator */}
                   <div 
-                    className="h-1 mt-3 rounded-full"
+                    className="h-1 mt-3 rounded-full w-full shrink-0"
                     style={{ backgroundColor: agent.color }}
                   />
                 </div>
@@ -140,22 +147,25 @@ export function AgentZones() {
 
           {/* Center hub below */}
           <div className="flex justify-center mt-8">
-            <div className="relative">
+            <div className="relative w-full">
               {/* Connection lines to center */}
-              <svg className="absolute inset-0 -translate-y-8 w-[600px] h-16 pointer-events-none" viewBox="0 0 600 60" preserveAspectRatio="xMidYMid meet" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                <line x1="50" y1="0" x2="50" y2="30" stroke="#3B82F6" strokeWidth="2" strokeDasharray="4 4" />
-                <line x1="200" y1="0" x2="200" y2="30" stroke="#8B5CF6" strokeWidth="2" strokeDasharray="4 4" />
-                <line x1="350" y1="0" x2="350" y2="30" stroke="#10B981" strokeWidth="2" strokeDasharray="4 4" />
-                <line x1="500" y1="0" x2="500" y2="30" stroke="#F59E0B" strokeWidth="2" strokeDasharray="4 4" />
-                <line x1="50" y1="30" x2="500" y2="30" stroke="#BFFF00" strokeWidth="2" opacity="0.5" />
-                <circle cx="50" cy="0" r="4" fill="#3B82F6" />
-                <circle cx="200" cy="0" r="4" fill="#8B5CF6" />
-                <circle cx="350" cy="0" r="4" fill="#10B981" />
-                <circle cx="500" cy="0" r="4" fill="#F59E0B" />
+              <svg className="absolute inset-0 -translate-y-8 w-full h-16 pointer-events-none" viewBox="0 0 1000 60" preserveAspectRatio="none">
+                <line x1="100" y1="0" x2="100" y2="30" stroke="#3B82F6" strokeWidth="2" strokeDasharray="4 4" />
+                <line x1="300" y1="0" x2="300" y2="30" stroke="#8B5CF6" strokeWidth="2" strokeDasharray="4 4" />
+                <line x1="500" y1="0" x2="500" y2="30" stroke="#EC4899" strokeWidth="2" strokeDasharray="4 4" />
+                <line x1="700" y1="0" x2="700" y2="30" stroke="#10B981" strokeWidth="2" strokeDasharray="4 4" />
+                <line x1="900" y1="0" x2="900" y2="30" stroke="#F59E0B" strokeWidth="2" strokeDasharray="4 4" />
+                <line x1="100" y1="30" x2="900" y2="30" stroke="#BFFF00" strokeWidth="2" opacity="0.5" />
+                <line x1="500" y1="30" x2="500" y2="60" stroke="#BFFF00" strokeWidth="2" opacity="0.5" />
+                <circle cx="100" cy="0" r="4" fill="#3B82F6" />
+                <circle cx="300" cy="0" r="4" fill="#8B5CF6" />
+                <circle cx="500" cy="0" r="4" fill="#EC4899" />
+                <circle cx="700" cy="0" r="4" fill="#10B981" />
+                <circle cx="900" cy="0" r="4" fill="#F59E0B" />
               </svg>
 
               {/* Center hub */}
-              <div className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg shadow-white/10">
+              <div className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg shadow-white/10 mx-auto mt-8">
                 <Bot className="w-10 h-10 text-[#0038FF]" />
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#BFFF00] rounded-full flex items-center justify-center">
                   <Mic2 className="w-2 h-2 text-[#0038FF]" />
@@ -204,12 +214,6 @@ export function AgentZones() {
             Создать агента
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
-        </div>
-
-        {/* Security */}
-        <div className="flex items-center justify-center gap-2 mt-6 text-white/30 text-xs">
-          <Lock className="w-3 h-3" />
-          <span>Изолированные зоны • Ваш контроль • Приватность</span>
         </div>
       </div>
     </section>

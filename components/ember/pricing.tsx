@@ -176,43 +176,6 @@ export function Pricing() {
             </div>
           ))}
         </div>
-
-        {/* FAQ */}
-        <div id="faq" className="mt-24 md:mt-32 max-w-3xl mx-auto">
-          <h3 className="font-display font-bold text-gray-900 text-2xl md:text-3xl text-center mb-8">
-            Частые вопросы
-          </h3>
-          <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <div
-                key={i}
-                className="border border-gray-200 rounded-2xl bg-white overflow-hidden"
-              >
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <span className="text-base font-medium text-gray-900 pr-4">
-                    {faq.q}
-                  </span>
-                  <ChevronDown 
-                    size={20} 
-                    className={`text-gray-400 flex-shrink-0 transition-transform ${
-                      openFaq === i ? "rotate-180" : ""
-                    }`} 
-                  />
-                </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-5 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {faq.a}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   )

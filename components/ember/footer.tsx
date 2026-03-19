@@ -55,10 +55,8 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12">
           {/* Brand */}
           <div className="col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-[#BFFF00] flex items-center justify-center">
-                <span className="text-[#0038FF] font-bold text-xs">OK</span>
-              </div>
+            <div className="flex items-center gap-2.5 mb-4">
+              <img src="/logo.svg" alt="OKAK" className="w-9 h-9" />
               <span className="font-display font-bold text-white text-xl">OKAK</span>
             </div>
             <p className="text-sm text-white/60 leading-relaxed max-w-[240px]">
@@ -88,10 +86,18 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-sm text-white/40">
             © 2026 OKAK. Все права защищены.
           </p>
+
+          {/* Powered by Lemon Corporation */}
+          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm cursor-default">
+            <span className="text-xs text-gray-500 font-medium tracking-wide">Powered by</span>
+            <img src="/Group 59dsfsdd.png" alt="Lemon Corporation" className="w-5 h-5 object-contain" />
+            <span className="text-sm text-[#00896E] font-bold">Lemon Corporation</span>
+          </div>
+
           <div className="flex items-center gap-6">
             <Link href="#" className="text-sm text-white/40 hover:text-white transition-colors">
               Конфиденциальность

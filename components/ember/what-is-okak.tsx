@@ -22,11 +22,11 @@ export function WhatIsOkak() {
               </span>?
             </h2>
             <p className="text-gray-600 text-lg leading-relaxed mb-6">
-              OKAK — это <strong>голосовой AI-агент</strong>, который работает на твоём компьютере. 
-              Слушает, запоминает, связывает. А ты решаешь — принимать предложения или сделать по-своему.
+              OKAK — это <strong>голосовой AI-агент</strong>, который работает на твоём компьютере как удобный оверлей. 
+              Никакой перегруженности в стиле Notion или Obsidian. Быстро зафиксируй мысль голосом — и работай дальше.
             </p>
             <p className="text-gray-600 text-lg leading-relaxed mb-8">
-              Хочешь — скажи голосом. Хочешь — запиши вручную. Всё под твоим контролем, просто быстрее.
+              Это не просто хранилище. Попроси агента перенести данные из одного файла в другой, проанализировать текст или настроить автоматизацию — всё голосом.
             </p>
             
             {/* Trust badges */}
@@ -107,6 +107,20 @@ export function WhatIsOkak() {
                     <div className="flex items-center gap-2 text-xs text-white/60">
                       <CheckCircle2 className="w-3 h-3 text-green-400" />
                       <span>Установил напоминание</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Command 5 - Vision */}
+                <div className="bg-white/10 backdrop-blur rounded-xl p-3 flex items-start gap-3">
+                  <div className="w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-1">"Что на этом скриншоте?"</p>
+                    <div className="flex items-center gap-2 text-xs text-white/60">
+                      <CheckCircle2 className="w-3 h-3 text-green-400" />
+                      <span>Распознал текст и сохранил</span>
                     </div>
                   </div>
                 </div>

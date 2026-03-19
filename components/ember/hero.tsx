@@ -16,23 +16,23 @@ export function Hero() {
         <div className="grid lg:grid-cols-2 gap-8 items-center">
           {/* Left - Text */}
           <div>
-            <h1 className="font-display text-[clamp(2.5rem,8vw,6rem)] font-bold text-white leading-[0.95] tracking-tight mb-6">
+            <h1 className="font-display text-[clamp(2.5rem,8vw,6rem)] font-bold text-white leading-[1.1] tracking-tight mb-6">
               <span className="text-[#BFFF00]">#</span>AI
               <br />
               <span className="relative inline-block">
-                ЗАМЕТКИ
+                АГЕНТ
                 <svg className="absolute -bottom-1 left-0 w-full h-3" viewBox="0 0 300 20" preserveAspectRatio="none">
                   <path d="M0,15 Q150,0 300,15" stroke="#BFFF00" strokeWidth="4" fill="none" strokeLinecap="round"/>
                 </svg>
               </span>
               <br />
-              <span className="text-white/90">КОТОРЫЕ</span>
+              <span className="text-white/90">ДЛЯ ТВОИХ</span>
               <br />
-              <span className="text-white/90">ДУМАЮТ</span>
+              <span className="text-white/90">ДАННЫХ</span>
             </h1>
 
             <p className="text-white/80 text-xl lg:text-2xl mb-8 leading-relaxed max-w-lg">
-              Скажи вслух или запиши — <span className="text-[#BFFF00] font-semibold">OKAK запомнит, свяжет и напомнит</span>
+              Твой личный Джарвис. Скажи, что нужно найти, перенести или структурировать — <span className="text-[#BFFF00] font-semibold">OKAK сделает это за тебя</span>
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 mb-6">

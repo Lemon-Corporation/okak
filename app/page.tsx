@@ -1,6 +1,8 @@
 import { Navbar } from "@/components/ember/navbar"
 import { Hero } from "@/components/ember/hero"
 import { WhatIsOkak } from "@/components/ember/what-is-okak"
+import { Comparison } from "@/components/ember/comparison"
+import { OverlayDemo } from "@/components/ember/overlay-demo"
 import { AgentZones } from "@/components/ember/agent-zones"
 import { Features } from "@/components/ember/features"
 import { FileUpload } from "@/components/ember/file-upload"
@@ -14,8 +16,10 @@ export default function Page() {
       <Navbar />
       <Hero />
       <WhatIsOkak />
-      <Features />
+      <Comparison />
+      <OverlayDemo />
       <AppNavigation />
+      <Features />
       <AgentZones />
       <FileUpload />
       <Pricing />

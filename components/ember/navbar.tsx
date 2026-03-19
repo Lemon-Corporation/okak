@@ -8,8 +8,7 @@ import { Menu, X } from "lucide-react"
 const links = [
   { label: "Продукт", href: "#features" },
   { label: "Как работает", href: "#how" },
-  { label: "Тарифы", href: "#pricing" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Тарифы", href: "#pricing" }
 ]
 
 export function Navbar() {
