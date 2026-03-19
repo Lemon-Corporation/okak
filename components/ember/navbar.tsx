@@ -53,11 +53,8 @@ export function Navbar() {
 
             {/* Actions */}
             <div className="hidden md:flex items-center gap-2 pr-2">
-              <Link href="#" className="text-sm text-white/80 hover:text-white transition-colors px-4 py-2 rounded-full hover:bg-white/10">
-                Войти
-              </Link>
-              <Link href="#" className="text-sm font-bold bg-[#BFFF00] text-[#0038FF] px-5 py-2.5 rounded-full hover:bg-[#d4ff4d] transition-colors">
-                Попробовать
+              <Link href="/join" className="text-sm font-bold bg-[#BFFF00] text-[#0038FF] px-5 py-2.5 rounded-full hover:bg-[#d4ff4d] transition-colors">
+                Записаться на тест
               </Link>
             </div>
 
@@ -82,9 +79,8 @@ export function Navbar() {
               </Link>
             ))}
             <div className="pt-4 flex flex-col gap-3">
-              <Link href="#" className="text-base text-white/70 py-2" onClick={() => setOpen(false)}>Войти</Link>
-              <Link href="#" className="text-center text-sm font-bold bg-[#BFFF00] text-[#0038FF] px-5 py-3.5 rounded-full" onClick={() => setOpen(false)}>
-                Попробовать бесплатно
+              <Link href="/join" className="text-center text-sm font-bold bg-[#BFFF00] text-[#0038FF] px-5 py-3.5 rounded-full" onClick={() => setOpen(false)}>
+                Записаться на тест
               </Link>
             </div>
           </div>

@@ -32,15 +32,15 @@ export function Footer() {
           </p>
           <div className="mt-10">
             <Link
-              href="#"
+              href="/join"
               className="group inline-flex items-center gap-2 bg-[#BFFF00] text-[#0038FF] text-base font-bold px-8 py-4 rounded-full hover:bg-[#d4ff4d] transition-colors"
             >
-              Попробовать OKAK бесплатно
+              Записаться на тест
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
           <p className="mt-6 text-sm text-white/50">
-            Бесплатно навсегда. Без карты. Без обязательств.
+            Присоединяйтесь к закрытому бета-тестированию
           </p>
         </div>
       </div>
@@ -86,10 +86,15 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <p className="text-sm text-white/40">
-            © 2026 OKAK. Все права защищены.
-          </p>
+        <div className="mt-16 pt-8 border-t border-white/10 flex flex-col items-center justify-between gap-6 md:flex-row">
+          <div className="flex flex-col gap-2 text-center md:text-left">
+            <p className="text-sm text-white/40">
+              © 2026 OKAK. Все права защищены.
+            </p>
+            <p className="text-xs text-white/30">
+              ООО "ЛЕМОН КОРП" | ИНН: 9726087431 | ОГРН: 1247700713446
+            </p>
+          </div>
 
           {/* Powered by Lemon Corporation */}
           <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm cursor-default">
@@ -99,10 +104,10 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-6">
-            <Link href="#" className="text-sm text-white/40 hover:text-white transition-colors">
+            <Link href="/privacy" className="text-sm text-white/40 hover:text-white transition-colors">
               Конфиденциальность
             </Link>
-            <Link href="#" className="text-sm text-white/40 hover:text-white transition-colors">
+            <Link href="/terms" className="text-sm text-white/40 hover:text-white transition-colors">
               Условия
             </Link>
           </div>

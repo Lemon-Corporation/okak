@@ -1,7 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Sparkles, FileText, Brain, Link2, CheckCircle, Bell, Mic, MessageCircle } from "lucide-react"
+import { ArrowRight, Sparkles, FileText, Brain, Link2, CheckCircle, Bell, Mic, MessageCircle, Monitor, Command } from "lucide-react"
+import Link from "next/link"
 
 export function Hero() {
   return (
@@ -39,16 +40,12 @@ export function Hero() {
               <Button 
                 size="lg" 
                 className="bg-[#BFFF00] hover:bg-[#d4ff4d] text-[#0038FF] font-bold text-lg px-8 h-14 rounded-full group"
+                asChild
               >
-                Начать бесплатно
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="border-2 border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white font-medium text-lg px-8 h-14 rounded-full"
-              >
-                Смотреть демо
+                <Link href="/join">
+                  Записаться на тест
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
               </Button>
             </div>
             

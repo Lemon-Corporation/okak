@@ -10,7 +10,7 @@ const plans = [
     period: "",
     desc: "Для знакомства",
     features: ["50 заметок", "Базовый AI", "Поиск по заметкам", "1 устройство"],
-    cta: "Начать бесплатно",
+    cta: "Записаться",
     highlight: false,
   },
   {
@@ -27,7 +27,7 @@ const plans = [
       "Умные напоминания",
       "Приоритетная поддержка",
     ],
-    cta: "Попробовать Pro",
+    cta: "Записаться",
     highlight: true,
     badge: "Популярный",
   },
@@ -164,7 +164,7 @@ export function Pricing() {
               </ul>
 
               <a
-                href="#"
+                href="/join"
                 className={`block text-center text-sm font-bold py-4 rounded-full transition-all ${
                   plan.highlight
                     ? "bg-[#BFFF00] text-[#0038FF] hover:bg-[#d4ff4d]"
