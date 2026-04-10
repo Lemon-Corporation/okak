@@ -1,118 +1,79 @@
-#  OKAK — голосовой AI-агент для заметок и задач
+# ОКАК
 
-Персональный голосовой помощник, который живёт на рабочем столе, слушает вас и сам организует информацию. Без переключения между приложениями и ручного ввода.
+Веб-приложение для заметок, задач, проектов и файлов с боковой навигацией и overlay для быстрого создания сущностей. Сейчас данные и вход хранятся локально (демо на Zustand + persist).
+
+## Требования
+
+- **Node.js** 20+ (рекомендуется LTS)
+- **pnpm** (в репозитории используется `pnpm-lock.yaml`)
+
+## Установка и запуск
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Приложение откроется по адресу [http://localhost:3000](http://localhost:3000).
+
+### Другие команды
+
+| Команда      | Назначение              |
+|-------------|-------------------------|
+| `pnpm dev`  | режим разработки (Next.js) |
+| `pnpm build`| production-сборка       |
+| `pnpm start`| запуск после `build`    |
+| `pnpm lint` | проверка ESLint         |
+
+## Основные страницы
+
+### Публичные
+
+| Путь        | Описание                          |
+|------------|-----------------------------------|
+| `/`        | Лендинг с описанием продукта      |
+| `/login`   | Вход                              |
+| `/register`| Регистрация                       |
+| `/pricing` | Тарифы                            |
+
+### Приложение (после входа)
+
+Защищённые маршруты группы `(app)` — без авторизации выполняется редирект на `/login`.
+
+| Путь              | Описание                    |
+|-------------------|-----------------------------|
+| `/space`          | Пространство (обзор)        |
+| `/projects`       | Список проектов             |
+| `/projects/[id]`  | Карточка проекта            |
+| `/notes`          | Заметки                     |
+| `/notes/[id]`     | Редактирование заметки      |
+| `/tasks`          | Задачи                      |
+| `/files`          | Файлы                       |
+| `/settings`       | Настройки профиля и аккаунта|
+
+В сайдбаре: кнопка **«Быстрое создание»** и глобальная горячая клавиша **Ctrl+Space** или **⌘+Space** (macOS) открывают overlay.
+
+## Тема и внешний вид
+
+- **Tailwind CSS v4** и переменные в `app/globals.css`.
+- Палитра на **OKLCH**: фон, текст, акценты, границы, палитра для графиков (`--chart-*`), отдельные токены для **сайдбара** (`--sidebar-*`).
+- **Светлая и тёмная** схемы: корневые переменные в `:root`, тёмная — в селекторе `.dark` (класс на контейнере; вариант `@custom-variant dark` завязан на `.dark *`).
+- Шрифты: **Geist** и **Geist Mono** (Next.js `next/font/google`).
+- UI: компоненты в духе **shadcn/ui** на **Radix UI**; иконки **Lucide**.
+
+Зависимость **next-themes** и обёртка `components/theme-provider.tsx` используются для согласования темы с уведомлениями (например, Sonner); при необходимости провайдер можно подключить в корневой layout.
+
+## Данные и состояние
+
+- **Zustand** (`lib/store.ts`) — пользователь, сущности, overlay, сайдбар.
+- **persist** — часть состояния сохраняется в браузере; при первом заходе подмешиваются **mock-данные** (`lib/mock-data.ts`).
+- Регистрация/вход — демо без бэкенда.
+
+## Стек
+
+- **Next.js** 16 (App Router), **React** 19, **TypeScript**
+- **Vercel Analytics** подключается в production в `app/layout.tsx`
 
 ---
 
-##  Зачем этот проект?
-
-Пользователь теряет информацию не потому что нет инструментов — а потому что нет времени их открывать. OKAK решает это: **мысль пришла → сказал → сохранилось**.
-
----
-
-##  Что умеет OKAK
-
-- Голосовой ввод на русском (Whisper + VAD)
-- Классификация намерений: создать заметку / найти / напомнить / ответить
-- Сохранение в векторную базу знаний (Qdrant)
-- Голосовой поиск по личной базе (RAG-pipeline)
-- Мультиагентная система: файлы, календарь, браузер
-- Overlay UI поверх любого окна
-- 7 собственных обученных ML-компонентов
-
----
-
-## Команда
-
-| Участник | Роль | ML-компонент |
-|----------|------|--------------|
-| Александр Ганяк | CEO, архитектура | Intent Classifier |
-| Михаил Пиччук | ML-инженер | ASR + VAD |
-| Кириллова Елена | Project Manager | Topic Classifier |
-| Михайловская Мария | Lead Frontend | Note Clustering |
-| Жгенти Дарья | Frontend | Priority Scorer |
-| Константин Никольский | Backend | Re-Ranker |
-| Андрей Смирнов | Backend | Duplicate Detector |
-
----
-
-## Настройка окружения для разработки
-
-### Требования
-- Python 3.10+
-- Node.js 18+
-- Docker (для Qdrant)
-- FFmpeg (для аудио)
-- NVIDIA GPU + CUDA (опционально)
-
-### 1. Клонирование репозитория
-```bash
-git clone https://github.com/Lemon-Corporation/okak.git
-cd okak
-```
-
-### 2. Backend (Python)
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-### 3. Frontend (Electron)
-```bash
-cd frontend
-npm install
-```
-
-### 4. Запуск Qdrant
-```bash
-docker run -p 6333:6333 qdrant/qdrant
-```
-
-### 5. Запуск приложения
-```bash
-python app.py
-```
-```bash
-cd frontend && npm start
-```
-
-### 6. Установка зависимостей для ML-компонентов
-```bash
-pip install torch transformers sentence-transformers
-pip install openai-whisper silero-vad
-pip install scikit-learn xgboost umap-learn hdbscan
-pip install qdrant-client langchain
-```
-
-### 7. Проверка установки
-```bash
-python -c "import torch; print(torch.__version__)"
-python -c "import whisper; print('Whisper OK')"
-python -c "import qdrant_client; print('Qdrant OK')"
-```
-
----
-
-### Структура проекта
-```text
-okak/
-├── backend/
-│   ├── models/          # ML-модели (Intent, ASR, Topic, etc.)
-│   ├── agents/          # Calendar, Files, Browse agents
-│   ├── knowledge/       # Qdrant + RAG pipeline
-│   └── api/             # FastAPI endpoints
-├── frontend/
-│   └── src/             # Electron + overlay UI
-├── requirements/
-│   ├── intent.txt
-│   ├── asr.txt
-│   ├── topic.txt
-│   └── ...
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-### Лицензия
-MIT
+Локальная разработка: достаточно `pnpm install` и `pnpm dev`.

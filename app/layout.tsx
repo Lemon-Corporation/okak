@@ -1,15 +1,14 @@
 import type { Metadata } from 'next'
-import { Inter, Space_Grotesk } from 'next/font/google'
+import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-inter' })
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' })
+const _geist = Geist({ subsets: ["latin"] });
+const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Ember — Одно место для всего, что на уме',
-  description: 'Скидывай идеи, встречи и ресёрчи в Ember — и он всё организует за тебя.',
-  generator: 'v0.app',
+  title: 'ОКАК — Заметки, задачи и проекты',
+  description: 'Все ваши заметки, задачи и файлы в одном месте с быстрым доступом через overlay',
   icons: {
     icon: [
       {
@@ -35,10 +34,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ru" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en">
       <body className="font-sans antialiased">
         {children}
-        <Analytics />
+        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )
