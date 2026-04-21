@@ -158,7 +158,7 @@ export function Overlay() {
 
   return (
     <Dialog open={isOverlayOpen} onOpenChange={setOverlayOpen}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogContent showCloseButton = {false} className="max-w-2xl gap-0 overflow-hidden p-0 sm:rounded-xl">
         <DialogTitle className="sr-only">Быстрые действия и поиск</DialogTitle>
         
         {mode === 'search' && (

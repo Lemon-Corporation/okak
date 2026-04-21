@@ -187,7 +187,7 @@ export default function FilesPage() {
     }
 
     return (
-      <Card key={file.id} className="group relative transition-shadow hover:shadow-md">
+      <Card key={file.id} className="group relative transition-shadow hover:border-blue-600">
         <CardContent className="p-4">
           <div className="mb-3 flex h-24 items-center justify-center rounded-lg bg-muted">
             {file.type.startsWith('image/') ? (

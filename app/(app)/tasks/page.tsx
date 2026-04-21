@@ -146,14 +146,14 @@ export default function TasksPage() {
       <div
         key={task.id}
         className={cn(
-          'group flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50',
+          'group flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-blue/5 hover:border-blue-400',
           task.status === 'done' && 'opacity-60'
         )}
       >
         <Checkbox
           checked={task.status === 'done'}
           onCheckedChange={() => handleToggleStatus(task)}
-          className="mt-0.5"
+          className="mt-0.5 border-blue-400"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

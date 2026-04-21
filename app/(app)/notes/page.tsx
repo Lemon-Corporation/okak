@@ -81,7 +81,7 @@ export default function NotesPage() {
     return (
       <Card
         key={note.id}
-        className="group relative transition-shadow hover:shadow-md"
+        className="group relative transition-shadow hover:border-blue-600"
       >
         <Link href={`/notes/${note.id}`} className="block">
           <CardContent className="p-4">
