@@ -69,8 +69,8 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-            <FileText className="h-4 w-4 text-sidebar-primary-foreground" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-lime">
+            <FileText className="h-4 w-4 text-black" />
           </div>
           <span className="font-semibold text-sidebar-foreground">ОКАК</span>
         </div>
@@ -81,13 +81,14 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <div className="px-2 py-2">
               <Button
-                variant="outline"
-                className="w-full justify-start gap-2"
+                variant="ghost"
+                className="relative overflow-visible h-10 w-full justify-start gap-2 rounded-xl bg-white/10 px-3 text-sm font-medium text-white hover:bg-white/15 hover:text-white"
                 onClick={() => setOverlayOpen(true)}
               >
                 <Plus className="h-4 w-4" />
                 Быстрое создание
-                <kbd className="ml-auto flex h-5 items-center gap-1 rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+
+                <kbd className="absolute -top-2 -right-2 flex h-6 items-center gap-1 rounded-md border border-white/20 bg-white/15 px-2 text-[10px] font-medium text-white/90 shadow-md backdrop-blur-md">
                   <Command className="h-3 w-3" />
                   Space
                 </kbd>
@@ -138,7 +139,7 @@ export function AppSidebar() {
                 {projects.length > 5 && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
-                      <Link href="/projects" className="text-muted-foreground">
+                      <Link href="/projects" className="text-sidebar-foreground">
                         <span>Показать все ({projects.length})</span>
                       </Link>
                     </SidebarMenuButton>
@@ -171,8 +172,8 @@ export function AppSidebar() {
         </SidebarMenu>
         {user && (
           <div className="flex items-center gap-2 px-2 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent">
-              <span className="text-xs font-medium text-sidebar-accent-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-lime">
+              <span className="text-xs font-medium text-black">
                 {user.name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -180,7 +181,7 @@ export function AppSidebar() {
               <span className="text-sm font-medium text-sidebar-foreground truncate max-w-[140px]">
                 {user.name}
               </span>
-              <span className="text-xs text-muted-foreground truncate max-w-[140px]">
+              <span className="text-xs text-sidebar-foreground truncate max-w-[140px]">
                 {user.email}
               </span>
             </div>
