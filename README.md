@@ -72,6 +72,7 @@ pnpm dev
 ## Стек
 
 - **Next.js** 16 (App Router), **React** 19, **TypeScript**
+- **Tailwind CSS** v4 (`@import 'tailwindcss'` в `app/globals.css`)
 - **Vercel Analytics** подключается в production в `app/layout.tsx`
 
 ---
