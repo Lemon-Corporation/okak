@@ -62,12 +62,21 @@ pnpm build:app
 API_URL=http://localhost:8000 pnpm dev
 ```
 
+## Функции
+
+- **Tray иконка** — приложение сворачивается в трей, клик показывает/скрывает окно
+- **Нативные уведомления** — IPC `app:notify` для отправки системных уведомлений
+- **Глобальные hotkeys** — `Cmd/Ctrl+Shift+O` показать/скрыть окно
+- **Retry загрузки** — в dev-режиме Electron ждёт до 30 секунд пока поднимется Next.js сервер
+- **macOS-style** — закрытие окна сворачивает в dock, не выходит из приложения
+
 ## IPC API
 
 | Канал | Направление | Описание |
 |-------|------------|----------|
 | `app:version` | main → renderer | Версия приложения |
 | `app:get-config` | main → renderer | Конфиг (`apiUrl`, `isDev`) |
+| `app:notify` | renderer → main | Нативное уведомление (`title`, `body`) |
 
 ## Known Issues
 

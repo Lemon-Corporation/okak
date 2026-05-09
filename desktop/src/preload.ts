@@ -8,6 +8,7 @@ const api = {
     electron: process.versions.electron,
   },
   getConfig: () => ipcRenderer.invoke('app:get-config'),
+  notify: (title: string, body: string) => ipcRenderer.invoke('app:notify', { title, body }),
 }
 
 contextBridge.exposeInMainWorld('electron', api)

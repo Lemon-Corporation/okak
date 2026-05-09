@@ -5,6 +5,9 @@ import {
   shell,
   ipcMain,
   nativeImage,
+  Tray,
+  Notification,
+  globalShortcut,
   type MenuItemConstructorOptions,
   type HandlerDetails,
 } from 'electron'
@@ -23,6 +26,7 @@ if (isDev) {
 }
 
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
 
 function getIcon(): Electron.NativeImage | undefined {
   const iconPath = path.join(__dirname, '..', 'assets', 'icon.svg')
@@ -52,9 +56,24 @@ function createWindow(): void {
     },
   })
 
-  // Load app
+  // Load app with retry for dev mode
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000')
+    const devUrl = 'http://localhost:3000'
+    let attempts = 0
+    const maxAttempts = 30
+
+    const tryLoad = () => {
+      attempts++
+      mainWindow!.loadURL(devUrl).catch(() => {
+        if (attempts < maxAttempts) {
+          log.info(`[dev] waiting for ${devUrl}, attempt ${attempts}/${maxAttempts}`)
+          setTimeout(tryLoad, 1000)
+        } else {
+          log.error(`[dev] failed to connect to ${devUrl} after ${maxAttempts} attempts`)
+        }
+      })
+    }
+    tryLoad()
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', '..', 'frontend', 'dist', 'index.html'))
@@ -70,8 +89,57 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Hide instead of close (macOS behavior)
+  mainWindow.on('close', (event) => {
+    if (process.platform === 'darwin') {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+}
+
+function createTray(): void {
+  const icon = getIcon()
+  if (!icon) {
+    log.warn('[tray] icon not found, skipping tray creation')
+    return
+  }
+
+  tray = new Tray(icon)
+  tray.setToolTip('ОКАК')
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Показать ОКАК',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show()
+          mainWindow.focus()
+        } else {
+          createWindow()
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Выход',
+      click: () => {
+        app.quit()
+      },
+    },
+  ])
+
+  tray.setContextMenu(contextMenu)
+  tray.on('click', () => {
+    if (mainWindow) {
+      mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()
+    } else {
+      createWindow()
+    }
   })
 }
 
@@ -147,10 +215,41 @@ function buildMenu(): Menu {
 ipcMain.handle('app:version', () => app.getVersion())
 ipcMain.handle('app:get-config', () => config)
 
+ipcMain.handle('app:notify', (_event, { title, body }: { title: string; body: string }) => {
+  if (!Notification.isSupported()) return false
+  const notification = new Notification({
+    title,
+    body,
+    icon: getIcon(),
+  })
+  notification.show()
+  return true
+})
+
 app.on('ready', () => {
   log.info('App starting... version:', app.getVersion())
   createWindow()
+  createTray()
   Menu.setApplicationMenu(buildMenu())
+
+  // Global shortcut to show/hide window
+  const shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+O', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide()
+      } else {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    } else {
+      createWindow()
+    }
+  })
+  log.info('[shortcut] registered:', shortcutRegistered)
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {
@@ -160,8 +259,16 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (mainWindow === null) {
+  if (mainWindow) {
+    mainWindow.show()
+  } else {
     createWindow()
+  }
+})
+
+app.on('before-quit', () => {
+  if (process.platform === 'darwin' && mainWindow) {
+    mainWindow.removeAllListeners('close')
   }
 })
 

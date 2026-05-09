@@ -11,6 +11,7 @@ export interface ElectronAPI {
     electron: string
   }
   getConfig(): Promise<DesktopConfig>
+  notify(title: string, body: string): Promise<boolean>
 }
 
 declare global {
@@ -30,4 +31,9 @@ export function getElectronPlatform(): string | undefined {
 export async function getElectronConfig(): Promise<DesktopConfig | undefined> {
   if (!isElectron()) return undefined
   return window.electron!.getConfig()
+}
+
+export async function sendElectronNotification(title: string, body: string): Promise<boolean> {
+  if (!isElectron()) return false
+  return window.electron!.notify(title, body)
 }

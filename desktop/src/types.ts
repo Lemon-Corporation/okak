@@ -11,6 +11,7 @@ export interface ElectronAPI {
     electron: string
   }
   getConfig(): Promise<DesktopConfig>
+  notify(title: string, body: string): Promise<boolean>
 }
 
 declare global {
