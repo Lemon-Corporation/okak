@@ -32,6 +32,8 @@ import {
   StickyNote,
   CheckSquare,
   Files,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 
 export default function ProjectsPage() {
@@ -40,12 +42,17 @@ export default function ProjectsPage() {
   const tasks = useAppStore((state) => state.tasks)
   const files = useAppStore((state) => state.files)
   const createProject = useAppStore((state) => state.createProject)
+  const loading = useAppStore((state) => state.loading.projects)
+  const loadError = useAppStore((state) => state.errors.projects)
+  const loadProjects = useAppStore((state) => state.loadProjects)
   const updateProject = useAppStore((state) => state.updateProject)
   const deleteProject = useAppStore((state) => state.deleteProject)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -63,9 +70,12 @@ export default function ProjectsPage() {
     files: files.filter((f) => f.projectId === projectId).length,
   })
 
-  const handleCreateProject = () => {
-    if (formData.name.trim()) {
-      createProject({
+  const handleCreateProject = async () => {
+    if (!formData.name.trim()) return
+    setActionError('')
+    setIsSaving(true)
+    try {
+      await createProject({
         name: formData.name.trim(),
         description: formData.description,
         color: formData.color,
@@ -73,6 +83,10 @@ export default function ProjectsPage() {
       })
       setFormData({ name: '', description: '', color: PROJECT_COLORS[0] })
       setIsCreateDialogOpen(false)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось создать проект')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -88,25 +102,38 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleUpdateProject = () => {
-    if (editingProject && formData.name.trim()) {
-      updateProject(editingProject, {
+  const handleUpdateProject = async () => {
+    if (!editingProject || !formData.name.trim()) return
+    setActionError('')
+    setIsSaving(true)
+    try {
+      await updateProject(editingProject, {
         name: formData.name.trim(),
         description: formData.description,
         color: formData.color,
       })
       setFormData({ name: '', description: '', color: PROJECT_COLORS[0] })
       setEditingProject(null)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось сохранить проект')
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const handleDelete = (projectId: string) => {
-    deleteProject(projectId)
+  const handleDelete = async (projectId: string) => {
+    setActionError('')
+    try {
+      await deleteProject(projectId)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось удалить проект')
+    }
   }
 
   const handleCloseDialog = () => {
     setIsCreateDialogOpen(false)
     setEditingProject(null)
+    setActionError('')
     setFormData({ name: '', description: '', color: PROJECT_COLORS[0] })
   }
 
@@ -135,7 +162,26 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {filteredProjects.length === 0 ? (
+        {actionError && (
+          <div role="alert" className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {actionError}
+          </div>
+        )}
+
+        {loadError && projects.length === 0 ? (
+          <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
+            <AlertCircle className="mb-4 h-12 w-12 text-destructive/70" />
+            <h3 className="mb-2 text-lg font-medium text-foreground">Не удалось загрузить проекты</h3>
+            <p className="mb-4 max-w-md text-sm text-muted-foreground">{loadError}</p>
+            <Button variant="outline" onClick={() => loadProjects()}>Повторить</Button>
+          </div>
+        ) : loading && projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+            <Loader2 className="mb-4 h-8 w-8 animate-spin" />
+            <p className="text-sm">Загружаем проекты...</p>
+          </div>
+        ) : filteredProjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <FolderKanban className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="mb-2 text-lg font-medium text-foreground">
@@ -243,6 +289,7 @@ export default function ProjectsPage() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Название проекта"
+                disabled={isSaving}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -251,6 +298,7 @@ export default function ProjectsPage() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Краткое описание (опционально)"
+                disabled={isSaving}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -270,15 +318,18 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
+          {actionError && (
+            <p role="alert" className="text-sm text-destructive">{actionError}</p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>
+            <Button variant="outline" onClick={handleCloseDialog} disabled={isSaving}>
               Отмена
             </Button>
             <Button
               onClick={editingProject ? handleUpdateProject : handleCreateProject}
-              disabled={!formData.name.trim()}
+              disabled={!formData.name.trim() || isSaving}
             >
-              {editingProject ? 'Сохранить' : 'Создать'}
+              {isSaving ? 'Сохранение...' : editingProject ? 'Сохранить' : 'Создать'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -11,6 +11,7 @@ import { FileText, Loader2 } from 'lucide-react'
 
 const errorMessages: Record<string, string> = {
   invalid_credentials: 'Неверный email или пароль',
+  token_expired: 'Сессия истекла, войдите снова',
   token_invalid: 'Ошибка авторизации, попробуйте снова',
 }
 
@@ -25,9 +26,20 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    const normalizedEmail = email.trim()
+    if (!normalizedEmail) {
+      setError('Введите email')
+      return
+    }
+    if (!password) {
+      setError('Введите пароль')
+      return
+    }
+
     setIsLoading(true)
     try {
-      await login(email, password)
+      await login(normalizedEmail, password)
       router.push('/space')
     } catch (err) {
       if (err instanceof ApiError) {
@@ -46,6 +58,8 @@ export default function LoginPage() {
     try {
       await login('demo@example.com', 'demo123')
       router.push('/space')
+    } catch {
+      setError('Не удалось войти в демо-аккаунт')
     } finally {
       setIsLoading(false)
     }
@@ -76,6 +90,8 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
+              aria-invalid={!!error}
               autoComplete="email"
             />
           </div>
@@ -91,12 +107,14 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
+              aria-invalid={!!error}
               autoComplete="current-password"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p role="alert" className="text-sm text-destructive">{error}</p>
           )}
 
           <Button type="submit" disabled={isLoading} className="mt-2">

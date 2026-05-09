@@ -103,6 +103,8 @@ interface AppStore {
   isOverlayOpen: boolean
   sidebarCollapsed: boolean
   isLoading: boolean
+  loading: { projects: boolean; notes: boolean; tasks: boolean }
+  errors: { projects: string | null; notes: string | null; tasks: string | null }
 
   // Auth actions (async — throw ApiError on failure)
   login: (email: string, password: string) => Promise<void>
@@ -144,7 +146,7 @@ interface AppStore {
   getProjectById: (id: string) => Project | undefined
 
   // Files CRUD (local only — upload handled via filesApi directly)
-  createFile: (file: CreateFileItem) => FileItem
+  createFile: (file: CreateFileItem & { id?: string }) => FileItem
   updateFile: (id: string, updates: UpdateFileItem) => void
   deleteFile: (id: string) => void
   getFileById: (id: string) => FileItem | undefined
@@ -170,6 +172,8 @@ export const useAppStore = create<AppStore>()(
       isOverlayOpen: false,
       sidebarCollapsed: false,
       isLoading: false,
+      loading: { projects: false, notes: false, tasks: false },
+      errors: { projects: null, notes: null, tasks: null },
 
       // --- Auth ---
 
@@ -223,34 +227,87 @@ export const useAppStore = create<AppStore>()(
       // --- Data loading ---
 
       loadProjects: async () => {
+        set((s) => ({
+          isLoading: true,
+          loading: { ...s.loading, projects: true },
+          errors: { ...s.errors, projects: null },
+        }))
         try {
           const res = await projectsApi.list({ limit: 100 })
           const existing = get().projects
           const colorMap = Object.fromEntries(existing.map((p) => [p.id, p.color]))
-          set({
+          set((s) => ({
             projects: res.items.map((p) =>
               mapProject(p, colorMap[p.id] ?? PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)])
             ),
+            errors: { ...s.errors, projects: null },
+          }))
+        } catch (err) {
+          set((s) => ({
+            errors: {
+              ...s.errors,
+              projects: err instanceof Error ? err.message : 'Не удалось загрузить проекты',
+            },
+          }))
+        } finally {
+          set((s) => {
+            const loading = { ...s.loading, projects: false }
+            return { loading, isLoading: Object.values(loading).some(Boolean) }
           })
-        } catch {}
+        }
       },
 
       loadNotes: async () => {
+        set((s) => ({
+          isLoading: true,
+          loading: { ...s.loading, notes: true },
+          errors: { ...s.errors, notes: null },
+        }))
         try {
           const res = await notesApi.list({ limit: 100 })
           const existing = get().notes
           const pinnedMap = Object.fromEntries(existing.map((n) => [n.id, n.isPinned]))
-          set({
+          set((s) => ({
             notes: res.items.map((n) => ({ ...mapNote(n), isPinned: pinnedMap[n.id] ?? false })),
+            errors: { ...s.errors, notes: null },
+          }))
+        } catch (err) {
+          set((s) => ({
+            errors: {
+              ...s.errors,
+              notes: err instanceof Error ? err.message : 'Не удалось загрузить заметки',
+            },
+          }))
+        } finally {
+          set((s) => {
+            const loading = { ...s.loading, notes: false }
+            return { loading, isLoading: Object.values(loading).some(Boolean) }
           })
-        } catch {}
+        }
       },
 
       loadTasks: async () => {
+        set((s) => ({
+          isLoading: true,
+          loading: { ...s.loading, tasks: true },
+          errors: { ...s.errors, tasks: null },
+        }))
         try {
           const res = await tasksApi.list({ limit: 100 })
-          set({ tasks: res.items.map(mapTask) })
-        } catch {}
+          set((s) => ({ tasks: res.items.map(mapTask), errors: { ...s.errors, tasks: null } }))
+        } catch (err) {
+          set((s) => ({
+            errors: {
+              ...s.errors,
+              tasks: err instanceof Error ? err.message : 'Не удалось загрузить задачи',
+            },
+          }))
+        } finally {
+          set((s) => {
+            const loading = { ...s.loading, tasks: false }
+            return { loading, isLoading: Object.values(loading).some(Boolean) }
+          })
+        }
       },
 
       // --- Overlay ---
@@ -407,7 +464,7 @@ export const useAppStore = create<AppStore>()(
       // --- Files (local only; use filesApi for actual upload) ---
 
       createFile: (fileData) => {
-        const file: FileItem = { ...fileData, id: generateId(), createdAt: now(), updatedAt: now() }
+        const file: FileItem = { ...fileData, id: fileData.id ?? generateId(), createdAt: now(), updatedAt: now() }
         set((s) => ({ files: [file, ...s.files] }))
         return file
       },

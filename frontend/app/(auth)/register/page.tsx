@@ -11,6 +11,7 @@ import { FileText, Loader2 } from 'lucide-react'
 
 const errorMessages: Record<string, string> = {
   email_taken: 'Этот email уже зарегистрирован',
+  invalid_credentials: 'Проверьте email и пароль',
 }
 
 export default function RegisterPage() {
@@ -27,8 +28,16 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
 
-    if (password !== confirmPassword) {
-      setError('Пароли не совпадают')
+    const normalizedName = name.trim()
+    const normalizedEmail = email.trim()
+
+    if (!normalizedName) {
+      setError('Введите имя')
+      return
+    }
+
+    if (!normalizedEmail) {
+      setError('Введите email')
       return
     }
 
@@ -37,9 +46,14 @@ export default function RegisterPage() {
       return
     }
 
+    if (password !== confirmPassword) {
+      setError('Пароли не совпадают')
+      return
+    }
+
     setIsLoading(true)
     try {
-      await register(email, password, name)
+      await register(normalizedEmail, password, normalizedName)
       router.push('/space')
     } catch (err) {
       if (err instanceof ApiError) {
@@ -77,6 +91,7 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={isLoading}
               autoComplete="name"
             />
           </div>
@@ -92,6 +107,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
               autoComplete="email"
             />
           </div>
@@ -107,7 +123,9 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
               autoComplete="new-password"
+              minLength={8}
             />
           </div>
 
@@ -122,12 +140,13 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
+              disabled={isLoading}
               autoComplete="new-password"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p role="alert" className="text-sm text-destructive">{error}</p>
           )}
 
           <Button type="submit" disabled={isLoading} className="mt-2">

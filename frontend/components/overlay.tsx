@@ -17,6 +17,8 @@ import {
   X,
   Plus,
   ArrowRight,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -40,6 +42,8 @@ export function Overlay() {
   const [mode, setMode] = useState<'search' | 'create-note' | 'create-task'>('search')
   const [newTitle, setNewTitle] = useState('')
   const [apiResults, setApiResults] = useState<SearchResponse | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Local search fallback
@@ -63,7 +67,7 @@ export function Overlay() {
           title: t.title,
           description: '',
           projectId: t.project_id,
-          status: t.status as 'todo' | 'in-progress' | 'done',
+          status: t.status === 'in_progress' ? 'in-progress' as const : t.status === 'done' ? 'done' as const : 'todo' as const,
           priority: 'medium' as const,
           dueDate: null,
           tags: [] as string[],
@@ -95,14 +99,21 @@ export function Overlay() {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (query.length < 2) {
       setApiResults(null)
+      setSearchError('')
+      setIsSearching(false)
       return
     }
     debounceRef.current = setTimeout(async () => {
+      setIsSearching(true)
+      setSearchError('')
       try {
         const res = await searchApi.search(query)
         setApiResults(res)
-      } catch {
+      } catch (err) {
         setApiResults(null)
+        setSearchError(err instanceof Error ? err.message : 'Не удалось выполнить поиск')
+      } finally {
+        setIsSearching(false)
       }
     }, 300)
     return () => {
@@ -116,6 +127,8 @@ export function Overlay() {
     setMode('search')
     setNewTitle('')
     setApiResults(null)
+    setSearchError('')
+    setIsSearching(false)
   }, [setOverlayOpen])
 
   const quickActions: QuickAction[] = [
@@ -262,7 +275,21 @@ export function Overlay() {
                 </div>
               )}
 
-              {query && !hasResults && (
+              {isSearching && (
+                <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Ищем...
+                </div>
+              )}
+
+              {!isSearching && searchError && (
+                <div role="alert" className="flex items-center gap-2 p-4 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  {searchError}. Показаны локальные результаты, если они есть.
+                </div>
+              )}
+
+              {query && !isSearching && !hasResults && (
                 <div className="p-8 text-center">
                   <p className="text-sm text-muted-foreground">
                     Ничего не найдено по запросу &quot;{query}&quot;
@@ -270,7 +297,7 @@ export function Overlay() {
                 </div>
               )}
 
-              {searchResults && hasResults && (
+              {searchResults && hasResults && !isSearching && (
                 <div className="p-2">
                   {searchResults.notes.length > 0 && (
                     <div className="mb-2">

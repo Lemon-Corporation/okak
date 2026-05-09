@@ -20,6 +20,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAppStore } from '@/lib/store'
+import { filesApi } from '@/lib/api'
+import type { BackendFile } from '@/lib/api/dto'
 import { formatFileSize, formatRelativeDate, getFileIcon, cn } from '@/lib/utils'
 import {
   Search,
@@ -34,10 +36,24 @@ import {
   FileAudio,
   Archive,
   Code,
-  File,
+  File as FileIcon,
   Grid3X3,
   List,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
+
+function mapUploadedFile(file: BackendFile, projectId: string) {
+  return {
+    id: file.id,
+    name: file.original_name,
+    type: file.mime_type,
+    size: file.size_bytes,
+    url: filesApi.downloadUrl(file.id),
+    projectId,
+    tags: [],
+  }
+}
 
 const iconMap: Record<string, React.ElementType> = {
   'image': Image,
@@ -49,7 +65,7 @@ const iconMap: Record<string, React.ElementType> = {
   'presentation': FileText,
   'archive': Archive,
   'code': Code,
-  'file': File,
+  'file': FileIcon,
 }
 
 export default function FilesPage() {
@@ -62,6 +78,8 @@ export default function FilesPage() {
   const [filterProject, setFilterProject] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isDragging, setIsDragging] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   const filteredFiles = files.filter((file) => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -89,44 +107,62 @@ export default function FilesPage() {
     setIsDragging(false)
   }, [])
 
+  const addFiles = useCallback(async (selectedFiles: globalThis.File[]) => {
+    if (selectedFiles.length === 0) return
+
+    setActionError('')
+    setIsUploading(true)
+    try {
+      for (const file of selectedFiles) {
+        if (filterProject !== 'all') {
+          const uploaded = await filesApi.upload(file, filterProject)
+          createFile(mapUploadedFile(uploaded, filterProject))
+        } else {
+          createFile({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: URL.createObjectURL(file),
+            projectId: null,
+            tags: [],
+          })
+        }
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось загрузить файл')
+    } finally {
+      setIsUploading(false)
+    }
+  }, [createFile, filterProject])
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-
-    const droppedFiles = Array.from(e.dataTransfer.files)
-    droppedFiles.forEach((file) => {
-      createFile({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        url: URL.createObjectURL(file),
-        projectId: filterProject !== 'all' ? filterProject : null,
-        tags: [],
-      })
-    })
-  }, [createFile, filterProject])
+    void addFiles(Array.from(e.dataTransfer.files))
+  }, [addFiles])
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || [])
-    selectedFiles.forEach((file) => {
-      createFile({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        url: URL.createObjectURL(file),
-        projectId: filterProject !== 'all' ? filterProject : null,
-        tags: [],
-      })
-    })
+    void addFiles(Array.from(e.target.files || []))
+    e.target.value = ''
   }
 
-  const handleDelete = (fileId: string) => {
+  const handleDelete = async (fileId: string) => {
+    setActionError('')
+    try {
+      await filesApi.delete(fileId)
+    } catch {
+      // Файл мог быть добавлен локально без backend id — тогда удаляем только из local store.
+    }
     deleteFile(fileId)
+  }
+
+  const handleDownload = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const renderFileCard = (file: typeof files[0]) => {
     const iconType = getFileIcon(file.type)
-    const IconComponent = iconMap[iconType] || File
+    const IconComponent = iconMap[iconType] || FileIcon
     const projectName = getProjectName(file.projectId)
     const projectColor = getProjectColor(file.projectId)
 
@@ -168,7 +204,7 @@ export default function FilesPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownload(file.url)}>
                 <Download className="h-4 w-4" />
                 Скачать
               </DropdownMenuItem>
@@ -225,7 +261,7 @@ export default function FilesPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownload(file.url)}>
                 <Download className="h-4 w-4" />
                 Скачать
               </DropdownMenuItem>
@@ -272,11 +308,12 @@ export default function FilesPage() {
                 multiple
                 className="hidden"
                 onChange={handleFileInput}
+                disabled={isUploading}
               />
-              <Button asChild>
+              <Button asChild disabled={isUploading}>
                 <span>
-                  <Upload className="h-4 w-4" />
-                  Загрузить
+                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {isUploading ? 'Загрузка...' : 'Загрузить'}
                 </span>
               </Button>
             </label>
@@ -316,6 +353,13 @@ export default function FilesPage() {
           </Select>
         </div>
 
+        {actionError && (
+          <div role="alert" className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {actionError}
+          </div>
+        )}
+
         <div
           className={cn(
             'mb-6 rounded-lg border-2 border-dashed p-8 text-center transition-colors',
@@ -327,9 +371,13 @@ export default function FilesPage() {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+          {isUploading ? (
+            <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-muted-foreground" />
+          ) : (
+            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+          )}
           <p className="text-sm text-muted-foreground">
-            Перетащите файлы сюда или{' '}
+            {isUploading ? 'Загружаем файлы...' : 'Перетащите файлы сюда или'}{' '}
             <label className="cursor-pointer text-primary underline">
               выберите
               <input
@@ -337,12 +385,18 @@ export default function FilesPage() {
                 multiple
                 className="hidden"
                 onChange={handleFileInput}
+                disabled={isUploading}
               />
             </label>
           </p>
         </div>
 
-        {filteredFiles.length === 0 ? (
+        {isUploading && files.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+            <Loader2 className="mb-4 h-8 w-8 animate-spin" />
+            <p className="text-sm">Файлы загружаются...</p>
+          </div>
+        ) : filteredFiles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Files className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="mb-2 text-lg font-medium text-foreground">

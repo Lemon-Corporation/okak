@@ -39,6 +39,8 @@ import {
   Trash2,
   Calendar,
   Flag,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 
 type TaskStatus = Task['status']
@@ -66,12 +68,17 @@ export default function TasksPage() {
   const tasks = useAppStore((state) => state.tasks)
   const projects = useAppStore((state) => state.projects)
   const createTask = useAppStore((state) => state.createTask)
+  const loading = useAppStore((state) => state.loading.tasks)
+  const loadError = useAppStore((state) => state.errors.tasks)
+  const loadTasks = useAppStore((state) => state.loadTasks)
   const updateTask = useAppStore((state) => state.updateTask)
   const deleteTask = useAppStore((state) => state.deleteTask)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -103,9 +110,12 @@ export default function TasksPage() {
     return projects.find((p) => p.id === projectId)?.color
   }
 
-  const handleCreateTask = () => {
-    if (newTask.title.trim()) {
-      createTask({
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) return
+    setActionError('')
+    setIsSaving(true)
+    try {
+      await createTask({
         title: newTask.title.trim(),
         description: newTask.description,
         projectId: newTask.projectId,
@@ -122,20 +132,39 @@ export default function TasksPage() {
         dueDate: '',
       })
       setIsCreateDialogOpen(false)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось создать задачу')
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const handleToggleStatus = (task: Task) => {
+  const handleToggleStatus = async (task: Task) => {
     const newStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done'
-    updateTask(task.id, { status: newStatus })
+    setActionError('')
+    try {
+      await updateTask(task.id, { status: newStatus })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось изменить статус задачи')
+    }
   }
 
-  const handleStatusChange = (taskId: string, status: TaskStatus) => {
-    updateTask(taskId, { status })
+  const handleStatusChange = async (taskId: string, status: TaskStatus) => {
+    setActionError('')
+    try {
+      await updateTask(taskId, { status })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось изменить статус задачи')
+    }
   }
 
-  const handleDelete = (taskId: string) => {
-    deleteTask(taskId)
+  const handleDelete = async (taskId: string) => {
+    setActionError('')
+    try {
+      await deleteTask(taskId)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось удалить задачу')
+    }
   }
 
   const renderTaskItem = (task: Task) => {
@@ -269,7 +298,26 @@ export default function TasksPage() {
           </Select>
         </div>
 
-        {filteredTasks.length === 0 ? (
+        {actionError && (
+          <div role="alert" className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {actionError}
+          </div>
+        )}
+
+        {loadError && tasks.length === 0 ? (
+          <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
+            <AlertCircle className="mb-4 h-12 w-12 text-destructive/70" />
+            <h3 className="mb-2 text-lg font-medium text-foreground">Не удалось загрузить задачи</h3>
+            <p className="mb-4 max-w-md text-sm text-muted-foreground">{loadError}</p>
+            <Button variant="outline" onClick={() => loadTasks()}>Повторить</Button>
+          </div>
+        ) : loading && tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+            <Loader2 className="mb-4 h-8 w-8 animate-spin" />
+            <p className="text-sm">Загружаем задачи...</p>
+          </div>
+        ) : filteredTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <CheckSquare className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="mb-2 text-lg font-medium text-foreground">
@@ -326,6 +374,7 @@ export default function TasksPage() {
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                 placeholder="Введите название задачи"
+                disabled={isSaving}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -335,6 +384,7 @@ export default function TasksPage() {
                 onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                 placeholder="Описание задачи (опционально)"
                 rows={3}
+                disabled={isSaving}
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -408,12 +458,15 @@ export default function TasksPage() {
               />
             </div>
           </div>
+          {actionError && (
+            <p role="alert" className="text-sm text-destructive">{actionError}</p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isSaving}>
               Отмена
             </Button>
-            <Button onClick={handleCreateTask} disabled={!newTask.title.trim()}>
-              Создать
+            <Button onClick={handleCreateTask} disabled={!newTask.title.trim() || isSaving}>
+              {isSaving ? 'Создание...' : 'Создать'}
             </Button>
           </DialogFooter>
         </DialogContent>
