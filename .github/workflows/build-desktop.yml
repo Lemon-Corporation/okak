@@ -1,0 +1,70 @@
+name: Build Desktop Apps
+
+on:
+  push:
+    branches: [master, main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build frontend
+        run: cd frontend && pnpm build
+
+      - name: Build desktop
+        run: cd desktop && pnpm build
+
+      - name: Build DMG
+        run: cd desktop && npx electron-builder --mac dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OKAK-macos
+          path: desktop/release/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build frontend
+        run: cd frontend; pnpm build
+
+      - name: Build desktop
+        run: cd desktop; pnpm build
+
+      - name: Build NSIS
+        run: cd desktop; npx electron-builder --win nsis
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OKAK-windows
+          path: desktop/release/*.exe

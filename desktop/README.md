@@ -41,14 +41,35 @@ pnpm dev
 
 ## Production-сборка
 
+### Локально (macOS)
+
 ```bash
 cd desktop
 pnpm build:app
 ```
 
-Создаёт пакеты в `desktop/release/`.
+Создаёт `desktop/release/OKAK-0.1.0.dmg` (~105 MB).
 
-**Блокер:** production-build требует static-export Next.js (`output: 'export'`) или встроенного сервера frontend. Сейчас dev-режим покрывает MVP-сценарий.
+### CI/CD (macOS + Windows)
+
+GitHub Actions собирает автоматически на каждый push тега `v*`:
+
+- **macOS:** `.dmg` — скачать, открыть, перетащить OKAK.app в Applications
+- **Windows:** `.exe` — скачать, запустить установщик
+
+Артефакты доступны в разделе Actions → Build Desktop Apps.
+
+### Архитектура production
+
+```
+Electron main
+    ↓
+spawn(child_process) → Next.js standalone server (localhost:3000)
+    ↓
+BrowserWindow.loadURL(http://localhost:3000)
+```
+
+Приложение содержит встроенный Node.js сервер — не требует интернета или внешнего backend.
 
 ## Конфигурация
 
@@ -80,5 +101,6 @@ API_URL=http://localhost:8000 pnpm dev
 
 ## Known Issues
 
-- Production static export не настроен (требует `generateStaticParams` для `[id]` роутов).
 - Файловые сценарии (upload/download) тестировались только в dev-режиме через `localhost`.
+- Windows-сборка требует GitHub Actions CI (не собирается локально на macOS).
+- macOS-код не подписан (требует Apple Developer ID для нотариуса).
