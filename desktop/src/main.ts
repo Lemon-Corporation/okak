@@ -12,6 +12,7 @@ import {
   type HandlerDetails,
 } from 'electron'
 import path from 'path'
+import { spawn, type ChildProcess } from 'child_process'
 import log from 'electron-log'
 import { config } from './config'
 
@@ -27,9 +28,10 @@ if (isDev) {
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+let serverProcess: ChildProcess | null = null
 
 function getIcon(): Electron.NativeImage | undefined {
-  const iconPath = path.join(__dirname, '..', 'assets', 'icon.svg')
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png')
   try {
     return nativeImage.createFromPath(iconPath)
   } catch {
@@ -43,7 +45,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: 'ОКАК',
+    title: 'OKAK',
     icon: getIcon(),
     show: false,
     webPreferences: {
@@ -76,7 +78,40 @@ function createWindow(): void {
     tryLoad()
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', '..', 'frontend', 'dist', 'index.html'))
+    // Production: start standalone Next.js server from extraResources
+    const resourcesPath = process.resourcesPath
+    const serverPath = path.join(resourcesPath, 'frontend', '.next', 'standalone', 'frontend', 'server.js')
+    const port = process.env.PORT || '3000'
+    const prodUrl = `http://localhost:${port}`
+
+    log.info('[prod] starting standalone server:', serverPath)
+    serverProcess = spawn(process.execPath, [serverPath], {
+      env: { ...process.env, PORT: port },
+      cwd: path.dirname(serverPath),
+      stdio: 'pipe',
+    })
+
+    serverProcess.stdout?.on('data', (data) => {
+      log.info('[server]', data.toString().trim())
+    })
+    serverProcess.stderr?.on('data', (data) => {
+      log.error('[server]', data.toString().trim())
+    })
+
+    let attempts = 0
+    const maxAttempts = 30
+    const tryLoad = () => {
+      attempts++
+      mainWindow!.loadURL(prodUrl).catch(() => {
+        if (attempts < maxAttempts) {
+          log.info(`[prod] waiting for ${prodUrl}, attempt ${attempts}/${maxAttempts}`)
+          setTimeout(tryLoad, 1000)
+        } else {
+          log.error(`[prod] failed to connect to ${prodUrl} after ${maxAttempts} attempts`)
+        }
+      })
+    }
+    tryLoad()
   }
 
   mainWindow.once('ready-to-show', () => {
@@ -269,6 +304,13 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   if (process.platform === 'darwin' && mainWindow) {
     mainWindow.removeAllListeners('close')
+  }
+})
+
+app.on('quit', () => {
+  if (serverProcess) {
+    serverProcess.kill()
+    serverProcess = null
   }
 })
 

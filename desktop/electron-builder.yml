@@ -1,5 +1,5 @@
 appId: com.okak.app
-productName: ОКАК
+productName: OKAK
 copyright: Copyright © 2026
 
 directories:
@@ -11,12 +11,19 @@ files:
   - assets/**/*
   - package.json
 
+extraResources:
+  - from: ../frontend/.next/standalone
+    to: frontend/.next/standalone
+    filter:
+      - "**/*"
+
 extraMetadata:
   main: dist/main.js
 
 mac:
   category: public.app-category.productivity
-  icon: assets/icon.icns
+  icon: assets/icon.png
+  executableName: OKAK
   target:
     - target: dmg
       arch:
@@ -24,14 +31,14 @@ mac:
         - arm64
 
 win:
-  icon: assets/icon.ico
+  icon: assets/icon.png
   target:
     - target: nsis
       arch:
         - x64
 
 linux:
-  icon: assets/icon.svg
+  icon: assets/icon.png
   category: Office
   target:
     - target: AppImage

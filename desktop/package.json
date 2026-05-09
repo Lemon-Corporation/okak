@@ -8,7 +8,8 @@
     "next-dev": "cd ../frontend && pnpm dev",
     "electron-dev": "wait-on http://localhost:3000 && electron dist/main.js --dev",
     "build": "tsc",
-    "build:app": "pnpm build && electron-builder",
+    "build:frontend": "cd ../frontend && pnpm build",
+    "build:app": "pnpm build:frontend && pnpm build && electron-builder",
     "lint": "eslint ."
   },
   "dependencies": {
