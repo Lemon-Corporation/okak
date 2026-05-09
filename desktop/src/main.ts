@@ -14,9 +14,18 @@ import {
 import path from 'path'
 import { spawn, type ChildProcess } from 'child_process'
 import log from 'electron-log'
+import Store from 'electron-store'
 import { config } from './config'
 
 const isDev = !app.isPackaged
+
+// Window state persistence
+const windowStore = new Store<{ bounds: { width: number; height: number; x?: number; y?: number } }>({
+  name: 'window-state',
+  defaults: {
+    bounds: { width: 1400, height: 900 },
+  },
+})
 
 if (isDev) {
   try {
@@ -30,6 +39,22 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let serverProcess: ChildProcess | null = null
 
+// Single instance lock
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+  process.exit(0)
+}
+
+app.on('second-instance', () => {
+  log.info('[app] second instance detected, focusing window')
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  }
+})
+
 function getIcon(): Electron.NativeImage | undefined {
   const iconPath = path.join(__dirname, '..', 'assets', 'icon.png')
   try {
@@ -40,9 +65,13 @@ function getIcon(): Electron.NativeImage | undefined {
 }
 
 function createWindow(): void {
+  const savedBounds = (windowStore as any).get('bounds') as { width: number; height: number; x?: number; y?: number }
+
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: savedBounds.width,
+    height: savedBounds.height,
+    x: savedBounds.x,
+    y: savedBounds.y,
     minWidth: 900,
     minHeight: 600,
     title: 'OKAK',
@@ -124,10 +153,21 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Save window state on resize/move
+  const saveBounds = () => {
+    if (mainWindow) {
+      const bounds = mainWindow.getNormalBounds()
+      ;(windowStore as any).set('bounds', bounds)
+    }
+  }
+  mainWindow.on('resize', saveBounds)
+  mainWindow.on('move', saveBounds)
+
   // Hide instead of close (macOS behavior)
   mainWindow.on('close', (event) => {
     if (process.platform === 'darwin') {
       event.preventDefault()
+      saveBounds()
       mainWindow?.hide()
     }
   })
