@@ -99,6 +99,48 @@ API_URL=http://localhost:8000 pnpm dev
 | `app:get-config` | main → renderer | Конфиг (`apiUrl`, `isDev`) |
 | `app:notify` | renderer → main | Нативное уведомление (`title`, `body`) |
 
+## Релизы и Auto-Updater
+
+### Как создать релиз
+
+```bash
+# 1. Обнови версию в desktop/package.json
+# 2. Закоммить изменения
+git add -A
+git commit -m "release: v0.1.0"
+
+# 3. Создай тег
+git tag v0.1.0
+
+# 4. Пуш — CI соберёт и опубликует
+git push origin master
+git push origin v0.1.0
+```
+
+GitHub Actions автоматически:
+- Собирает `.dmg` (macOS) и `.exe` (Windows)
+- Публикует в [GitHub Releases](https://github.com/Lemon-Corporation/okak/releases)
+
+### Как пользователь получает обновления
+
+1. **Первая установка:** скачивает `OKAK-0.1.0.dmg` или `.exe` с сайта/GitHub
+2. **Авто-обновление:** при старте приложение проверяет GitHub Releases
+3. **Если есть новая версия:** показывает уведомление → скачивает → устанавливает при перезапуске
+
+### Как это работает
+
+```
+Приложение стартует
+    ↓
+autoUpdater.checkForUpdatesAndNotify()
+    ↓
+Сравнивает package.json version с latest GitHub Release
+    ↓
+Если v0.1.1 > v0.1.0 → скачивает → уведомляет пользователя
+```
+
+**Настройка:** `electron-builder.yml` → `publish: github` (owner: Lemon-Corporation, repo: okak)
+
 ## Known Issues
 
 - Файловые сценарии (upload/download) тестировались только в dev-режиме через `localhost`.
