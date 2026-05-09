@@ -1,0 +1,13 @@
+{
+  "name": "okak",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && pnpm dev",
+    "dev:desktop": "cd desktop && pnpm dev",
+    "build": "cd frontend && pnpm build",
+    "build:desktop": "cd desktop && pnpm build:app",
+    "lint": "cd frontend && pnpm lint"
+  },
+  "packageManager": "pnpm@10.18.2"
+}

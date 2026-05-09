@@ -77,4 +77,17 @@ pnpm dev
 
 ---
 
+## Desktop (Electron)
+
+```bash
+cd desktop
+pnpm dev
+```
+
+Откроется Electron с загруженным frontend dev-сервером.
+
+Подробнее: [`desktop/README.md`](desktop/README.md)
+
+---
+
 Локальная разработка: достаточно `pnpm install` и `pnpm dev`.

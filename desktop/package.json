@@ -1,0 +1,26 @@
+{
+  "name": "okak-desktop",
+  "version": "0.1.0",
+  "description": "Desktop application for ОКАК",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "concurrently \"pnpm:next-dev\" \"pnpm:electron-dev\"",
+    "next-dev": "cd ../frontend && pnpm dev",
+    "electron-dev": "wait-on http://localhost:3000 && electron dist/main.js --dev",
+    "build": "tsc",
+    "build:app": "pnpm build && electron-builder",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "electron-log": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.0",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-reloader": "^1.2.3",
+    "typescript": "^5.7.3",
+    "wait-on": "^8.0.0"
+  }
+}
