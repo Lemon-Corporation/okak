@@ -60,7 +60,7 @@ function createWindow(): void {
 
   // Load app with retry for dev mode
   if (isDev) {
-    const devUrl = 'http://localhost:3000'
+    const devUrl = 'http://localhost:3000/login'
     let attempts = 0
     const maxAttempts = 30
 
@@ -82,7 +82,7 @@ function createWindow(): void {
     const resourcesPath = process.resourcesPath
     const serverPath = path.join(resourcesPath, 'frontend', '.next', 'standalone', 'frontend', 'server.js')
     const port = process.env.PORT || '3000'
-    const prodUrl = `http://localhost:${port}`
+    const prodUrl = `http://localhost:${port}/login`
 
     log.info('[prod] starting standalone server:', serverPath)
     serverProcess = spawn(process.execPath, [serverPath], {
