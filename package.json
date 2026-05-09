@@ -5,9 +5,16 @@
   "scripts": {
     "dev": "cd frontend && pnpm dev",
     "dev:desktop": "cd desktop && pnpm dev",
+    "dev:full": "concurrently \"pnpm:backend\" \"pnpm:frontend\" \"wait-on http://localhost:3000 && cd desktop && pnpm electron-dev\"",
+    "backend": "cd backend && source .venv/bin/activate && uvicorn main:app --reload",
+    "frontend": "cd frontend && pnpm dev",
     "build": "cd frontend && pnpm build",
     "build:desktop": "cd desktop && pnpm build:app",
     "lint": "cd frontend && pnpm lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "wait-on": "^8.0.0"
   },
   "packageManager": "pnpm@10.18.2"
 }
