@@ -2,9 +2,6 @@ appId: com.okak.app
 productName: OKAK
 copyright: Copyright © 2026
 
-electronDist: ../node_modules/.pnpm/electron@34.5.8/node_modules/electron/dist
-electronVersion: 34.5.8
-
 directories:
   output: release
   buildResources: assets
