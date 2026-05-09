@@ -64,7 +64,7 @@ export default function SpacePage() {
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
             <Link key={stat.label} href={stat.href}>
-              <Card className="transition-colors hover:bg-accent/50">
+              <Card className="transition-colors hover:border-blue-600">
                 <CardContent className="flex items-center gap-4 p-4">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}>
                     <stat.icon className="h-5 w-5" />
@@ -117,7 +117,7 @@ export default function SpacePage() {
                     <Link
                       key={note.id}
                       href={`/notes/${note.id}`}
-                      className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-accent"
+                      className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-blue/5"
                     >
                       <StickyNote className="mt-0.5 h-4 w-4 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
@@ -175,7 +175,7 @@ export default function SpacePage() {
                   {activeTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-accent"
+                      className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-blue/5"
                     >
                       <div className={`h-2 w-2 rounded-full ${
                         task.priority === 'high' ? 'bg-red-500' :

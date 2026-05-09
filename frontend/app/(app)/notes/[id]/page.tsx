@@ -76,6 +76,19 @@ export default function NoteDetailPage() {
 
     return () => clearTimeout(timeout)
   }, [title, content, projectId, tags, noteId, note, updateNote])
+  const uniqueProjectsMap = new Map()
+
+  projects.forEach((project) => {
+    if (!uniqueProjectsMap.has(project.name)) {
+      uniqueProjectsMap.set(project.name, project)
+    }
+
+    if (project.id === projectId) {
+      uniqueProjectsMap.set(project.name, project)
+    }
+  })
+
+  const uniqueProjects = Array.from(uniqueProjectsMap.values())
 
   if (!note) {
     return (
@@ -180,7 +193,7 @@ export default function NoteDetailPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Без проекта</SelectItem>
-                  {projects.map((project) => (
+                  {uniqueProjects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       <div className="flex items-center gap-2">
                         <div

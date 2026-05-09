@@ -158,7 +158,7 @@ export default function ProjectsPage() {
             {filteredProjects.map((project) => {
               const stats = getProjectStats(project.id)
               return (
-                <Card key={project.id} className="group relative transition-shadow hover:shadow-md">
+                <Card key={project.id} className="group relative transition-shadow hover:border-blue-600">
                   <Link href={`/projects/${project.id}`} className="block">
                     <CardHeader className="pb-3">
                       <div className="flex items-start gap-3">
