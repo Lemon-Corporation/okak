@@ -119,7 +119,12 @@ git push origin v0.1.0
 
 GitHub Actions автоматически:
 - Собирает `.dmg` (macOS) и `.exe` (Windows)
-- Публикует в [GitHub Releases](https://github.com/Lemon-Corporation/okak/releases)
+- Публикует в [okak-release](https://github.com/Lemon-Corporation/okak-release/releases) — отдельный публичный репозиторий
+
+**Зачем отдельный репозиторий?**
+- Открытый исходный код релизов = доверие пользователей
+- Не флагается антивирусами как "неизвестное ПО"
+- Чистый разделение: приватный код ↔ публичные сборки
 
 ### Как пользователь получает обновления
 
