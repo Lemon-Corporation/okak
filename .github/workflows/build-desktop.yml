@@ -65,8 +65,18 @@ jobs:
       - name: Build desktop
         run: cd desktop; pnpm build
 
-      - name: Build NSIS
+      - name: Generate self-signed certificate
+        run: |
+          cd desktop
+          openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=OKAK"
+          openssl pkcs12 -export -out cert.pfx -inkey key.pem -in cert.pem -password pass:okak123
+          del key.pem cert.pem
+
+      - name: Build signed NSIS
         run: cd desktop; npx electron-builder --win nsis --publish never
+        env:
+          CSC_LINK: cert.pfx
+          CSC_KEY_PASSWORD: okak123
 
       - name: Sign with SignPath (if configured)
         if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
@@ -87,6 +97,8 @@ jobs:
         run: cd desktop; npx electron-builder --win nsis --publish always
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          CSC_LINK: cert.pfx
+          CSC_KEY_PASSWORD: okak123
 
       - uses: actions/upload-artifact@v4
         with:
