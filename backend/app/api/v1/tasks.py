@@ -1,61 +1,151 @@
 import uuid
+from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.core.database import get_db
-from app.models.task import Task
+from app.ioc.container import AppContainer
+from app.presentation.dependencies import get_container, get_current_user
+from app.schemas.auth import UserRecord
+from app.schemas.enums import TaskPriority, TaskStatus
+from app.schemas.files import FileAttachRequest, TaskFileLinkResponse
+from app.schemas.tasks import (
+    CreateTaskCommand,
+    PaginatedTasksResponse,
+    TaskCreateRequest,
+    TaskFilters,
+    TaskFullResponse,
+    TaskResponse,
+    TaskUpdateRequest,
+    UpdateTaskCommand,
+)
 
 router = APIRouter()
 
 
-class TaskIn(BaseModel):
-    title: str
-    description: str = ""
-    done: bool = False
-    project_id: uuid.UUID | None = None
+@router.get("", response_model=PaginatedTasksResponse)
+async def list_tasks(
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+    project_id: uuid.UUID | None = None,
+    status_filter: Annotated[TaskStatus | None, Query(alias="status")] = None,
+    priority: TaskPriority | None = None,
+    linked_note_id: uuid.UUID | None = None,
+    due_before: datetime | None = None,
+    due_after: datetime | None = None,
+    archived: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+) -> PaginatedTasksResponse:
+    return await container.task_service.list_tasks(
+        TaskFilters(
+            owner_user_id=current_user.id,
+            project_id=project_id,
+            status=status_filter,
+            priority=priority,
+            linked_note_id=linked_note_id,
+            due_before=due_before,
+            due_after=due_after,
+            archived=archived,
+            limit=limit,
+            offset=offset,
+        )
+    )
 
 
-class TaskOut(BaseModel):
-    id: uuid.UUID
-    title: str
-    description: str
-    done: bool
-    project_id: uuid.UUID | None
-
-    class Config:
-        from_attributes = True
-
-
-@router.get("/", response_model=list[TaskOut])
-async def list_tasks(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Task))
-    return result.scalars().all()
-
-
-@router.post("/", response_model=TaskOut, status_code=201)
-async def create_task(body: TaskIn, db: AsyncSession = Depends(get_db)):
-    task = Task(**body.model_dump())
-    db.add(task)
-    await db.commit()
-    await db.refresh(task)
-    return task
+@router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+async def create_task(
+    body: TaskCreateRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> TaskResponse:
+    return await container.task_service.create_task(
+        CreateTaskCommand(
+            owner_user_id=current_user.id,
+            project_id=body.project_id,
+            title=body.title,
+            description=body.description,
+            status=body.status,
+            priority=body.priority,
+            due_at=body.due_at,
+            linked_note_id=body.linked_note_id,
+        )
+    )
 
 
-@router.patch("/{task_id}", response_model=TaskOut)
-async def update_task(task_id: uuid.UUID, body: TaskIn, db: AsyncSession = Depends(get_db)):
-    task = await db.get(Task, task_id)
-    for k, v in body.model_dump(exclude_unset=True).items():
-        setattr(task, k, v)
-    await db.commit()
-    await db.refresh(task)
-    return task
+@router.get("/{task_id}", response_model=TaskFullResponse)
+async def get_task(
+    task_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> TaskFullResponse:
+    return await container.task_service.get_task(
+        task_id=task_id,
+        owner_user_id=current_user.id,
+    )
 
 
-@router.delete("/{task_id}", status_code=204)
-async def delete_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    task = await db.get(Task, task_id)
-    await db.delete(task)
-    await db.commit()
+@router.patch("/{task_id}", response_model=TaskFullResponse)
+async def update_task(
+    task_id: uuid.UUID,
+    body: TaskUpdateRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> TaskFullResponse:
+    return await container.task_service.update_task(
+        task_id=task_id,
+        command=UpdateTaskCommand(
+            owner_user_id=current_user.id,
+            title=body.title,
+            description=body.description,
+            status=body.status,
+            priority=body.priority,
+            due_at=body.due_at,
+            due_at_set="due_at" in body.model_fields_set,
+            linked_note_id=body.linked_note_id,
+            linked_note_id_set="linked_note_id" in body.model_fields_set,
+        ),
+    )
+
+
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(
+    task_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> Response:
+    await container.task_service.delete_task(task_id=task_id, owner_user_id=current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{task_id}/files",
+    response_model=TaskFileLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def attach_task_file(
+    task_id: uuid.UUID,
+    body: FileAttachRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> TaskFileLinkResponse:
+    return await container.task_service.attach_file(
+        task_id=task_id,
+        file_id=body.file_id,
+        owner_user_id=current_user.id,
+    )
+
+
+@router.delete("/{task_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def detach_task_file(
+    task_id: uuid.UUID,
+    file_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> Response:
+    await container.task_service.detach_file(
+        task_id=task_id,
+        file_id=file_id,
+        owner_user_id=current_user.id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -3,7 +3,7 @@ from app.core.config import settings
 
 async def chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
     """Send messages to the configured LLM provider and return its response."""
-    if settings.llm_provider == "openai":
+    if settings.llm.provider == "openai":
         return await _openai_chat(messages, tools)
     return await _qwen_chat(messages, tools)
 
@@ -11,7 +11,7 @@ async def chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
 async def _openai_chat(messages: list[dict], tools: list[dict] | None) -> dict:
     import openai
 
-    client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+    client = openai.AsyncOpenAI(api_key=settings.llm.openai_api_key)
     kwargs: dict = {"model": "gpt-4o-mini", "messages": messages}
     if tools:
         kwargs["tools"] = tools
@@ -23,7 +23,7 @@ async def _qwen_chat(messages: list[dict], tools: list[dict] | None) -> dict:
     import openai
 
     client = openai.AsyncOpenAI(
-        api_key=settings.qwen_api_key,
+        api_key=settings.llm.qwen_api_key,
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     kwargs: dict = {"model": "qwen-plus", "messages": messages}

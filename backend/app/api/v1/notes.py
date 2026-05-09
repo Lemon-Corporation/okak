@@ -1,57 +1,172 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.core.database import get_db
-from app.models.note import Note
+from app.ioc.container import AppContainer
+from app.presentation.dependencies import get_container, get_current_user
+from app.schemas.auth import UserRecord
+from app.schemas.enums import NoteStatus
+from app.schemas.files import FileAttachRequest, NoteFileLinkResponse
+from app.schemas.notes import (
+    CreateNoteCommand,
+    NoteCreateRequest,
+    NoteFilters,
+    NoteFullResponse,
+    NoteResponse,
+    NoteUpdateRequest,
+    PaginatedNotesResponse,
+    UpdateNoteCommand,
+)
+from app.schemas.tags import NoteTagLinkResponse, TagAttachRequest
 
 router = APIRouter()
 
 
-class NoteIn(BaseModel):
-    title: str = ""
-    content: str = ""
+@router.get("", response_model=PaginatedNotesResponse)
+async def list_notes(
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+    project_id: uuid.UUID | None = None,
+    status_filter: Annotated[NoteStatus | None, Query(alias="status")] = None,
+    tag_id: uuid.UUID | None = None,
+    archived: bool = False,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> PaginatedNotesResponse:
+    return await container.note_service.list_notes(
+        NoteFilters(
+            owner_user_id=current_user.id,
+            project_id=project_id,
+            status=status_filter,
+            tag_id=tag_id,
+            archived=archived,
+            q=q,
+            limit=limit,
+            offset=offset,
+        )
+    )
 
 
-class NoteOut(BaseModel):
-    id: uuid.UUID
-    title: str
-    content: str
-
-    class Config:
-        from_attributes = True
-
-
-@router.get("/", response_model=list[NoteOut])
-async def list_notes(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Note))
-    return result.scalars().all()
-
-
-@router.post("/", response_model=NoteOut, status_code=201)
-async def create_note(body: NoteIn, db: AsyncSession = Depends(get_db)):
-    note = Note(**body.model_dump())
-    db.add(note)
-    await db.commit()
-    await db.refresh(note)
-    return note
+@router.post("", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+async def create_note(
+    body: NoteCreateRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> NoteResponse:
+    return await container.note_service.create_note(
+        CreateNoteCommand(
+            owner_user_id=current_user.id,
+            project_id=body.project_id,
+            title=body.title,
+            content=body.content,
+            status=body.status,
+        )
+    )
 
 
-@router.patch("/{note_id}", response_model=NoteOut)
-async def update_note(note_id: uuid.UUID, body: NoteIn, db: AsyncSession = Depends(get_db)):
-    note = await db.get(Note, note_id)
-    for k, v in body.model_dump(exclude_unset=True).items():
-        setattr(note, k, v)
-    await db.commit()
-    await db.refresh(note)
-    return note
+@router.get("/{note_id}", response_model=NoteFullResponse)
+async def get_note(
+    note_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> NoteFullResponse:
+    return await container.note_service.get_note(
+        note_id=note_id,
+        owner_user_id=current_user.id,
+    )
 
 
-@router.delete("/{note_id}", status_code=204)
-async def delete_note(note_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    note = await db.get(Note, note_id)
-    await db.delete(note)
-    await db.commit()
+@router.patch("/{note_id}", response_model=NoteFullResponse)
+async def update_note(
+    note_id: uuid.UUID,
+    body: NoteUpdateRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> NoteFullResponse:
+    return await container.note_service.update_note(
+        note_id=note_id,
+        command=UpdateNoteCommand(
+            owner_user_id=current_user.id,
+            title=body.title,
+            content=body.content,
+            status=body.status,
+        ),
+    )
+
+
+@router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_note(
+    note_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> Response:
+    await container.note_service.delete_note(note_id=note_id, owner_user_id=current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{note_id}/tags",
+    response_model=NoteTagLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def attach_note_tag(
+    note_id: uuid.UUID,
+    body: TagAttachRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> NoteTagLinkResponse:
+    return await container.note_service.attach_tag(
+        note_id=note_id,
+        tag_id=body.tag_id,
+        owner_user_id=current_user.id,
+    )
+
+
+@router.delete("/{note_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def detach_note_tag(
+    note_id: uuid.UUID,
+    tag_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> Response:
+    await container.note_service.detach_tag(
+        note_id=note_id,
+        tag_id=tag_id,
+        owner_user_id=current_user.id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{note_id}/files",
+    response_model=NoteFileLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def attach_note_file(
+    note_id: uuid.UUID,
+    body: FileAttachRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> NoteFileLinkResponse:
+    return await container.note_service.attach_file(
+        note_id=note_id,
+        file_id=body.file_id,
+        owner_user_id=current_user.id,
+    )
+
+
+@router.delete("/{note_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def detach_note_file(
+    note_id: uuid.UUID,
+    file_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> Response:
+    await container.note_service.detach_file(
+        note_id=note_id,
+        file_id=file_id,
+        owner_user_id=current_user.id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -25,6 +25,43 @@ pnpm dev
 | `pnpm start`| запуск после `build`    |
 | `pnpm lint` | проверка ESLint         |
 
+Frontend по-прежнему запускается отдельно через `pnpm install` и `pnpm dev`.
+
+## Backend
+
+### Docker Compose
+
+```bash
+cd backend
+cp .env.example .env
+docker compose up --build backend -d
+```
+
+Compose поднимает PostgreSQL 16 и backend API. Миграции Alembic применяются автоматически при старте backend service, затем приложение запускается через `uvicorn`.
+Backend service читает переменные из `backend/.env`; для контейнерного запуска compose переопределяет хост PostgreSQL на `postgres`.
+
+Адреса:
+
+| URL | Назначение |
+|-----|------------|
+| [http://localhost:8000](http://localhost:8000) | Backend API |
+| [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI |
+| [http://localhost:8000/health](http://localhost:8000/health) | Healthcheck |
+
+### Локальный запуск без Docker
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+alembic upgrade head
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Для локального запуска без Docker нужен доступный PostgreSQL, параметры подключения задаются в `.env` через переменные `OKAK_POSTGRES__*`.
+
 ## Основные страницы
 
 ### Публичные
