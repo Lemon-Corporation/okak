@@ -12,6 +12,8 @@ export interface ElectronAPI {
   }
   getConfig(): Promise<DesktopConfig>
   notify(title: string, body: string): Promise<boolean>
+  openFileDialog(): Promise<string[] | null>
+  checkOnline(): Promise<boolean>
 }
 
 declare global {

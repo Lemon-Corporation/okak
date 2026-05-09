@@ -13,6 +13,8 @@ const api = {
     ipcRenderer.removeAllListeners('app:file-drop')
     ipcRenderer.on('app:file-drop', (_event, files) => callback(files))
   },
+  openFileDialog: () => ipcRenderer.invoke('app:open-file'),
+  checkOnline: () => ipcRenderer.invoke('app:check-online'),
 }
 
 contextBridge.exposeInMainWorld('electron', api)

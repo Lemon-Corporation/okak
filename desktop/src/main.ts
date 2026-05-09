@@ -8,9 +8,11 @@ import {
   Tray,
   Notification,
   globalShortcut,
+  dialog,
   type MenuItemConstructorOptions,
   type HandlerDetails,
 } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import { spawn, type ChildProcess } from 'child_process'
 import log from 'electron-log'
@@ -38,6 +40,34 @@ if (isDev) {
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let serverProcess: ChildProcess | null = null
+
+// Auto-updater
+if (!isDev) {
+  autoUpdater.checkForUpdatesAndNotify()
+  autoUpdater.on('update-available', () => {
+    log.info('[updater] update available')
+  })
+  autoUpdater.on('update-downloaded', () => {
+    log.info('[updater] update downloaded, will install on quit')
+  })
+}
+
+// Deep link protocol
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('okak', process.execPath, [path.resolve(process.argv[1])])
+  }
+} else {
+  app.setAsDefaultProtocolClient('okak')
+}
+
+// Crash handler
+process.on('uncaughtException', (error) => {
+  log.error('[crash] uncaughtException:', error)
+})
+process.on('unhandledRejection', (reason) => {
+  log.error('[crash] unhandledRejection:', reason)
+})
 
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock()
@@ -310,6 +340,40 @@ ipcMain.handle('app:notify', (_event, { title, body }: { title: string; body: st
   })
   notification.show()
   return true
+})
+
+// Native file dialog
+ipcMain.handle('app:open-file', async () => {
+  if (!mainWindow) return null
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+  })
+  return result.canceled ? null : result.filePaths
+})
+
+// Check backend connectivity
+ipcMain.handle('app:check-online', async () => {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    const response = await fetch(`${config.apiUrl}/health`, { signal: controller.signal })
+    clearTimeout(timeout)
+    return response.ok
+  } catch {
+    return false
+  }
+})
+
+// Deep link handler
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  log.info('[deep-link] opened:', url)
+  if (mainWindow) {
+    const route = url.replace('okak://', '')
+    mainWindow.loadURL(isDev ? `http://localhost:3000/${route}` : `http://localhost:${process.env.PORT || '3000'}/${route}`)
+    mainWindow.show()
+    mainWindow.focus()
+  }
 })
 
 app.on('ready', () => {

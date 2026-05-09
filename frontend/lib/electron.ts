@@ -12,6 +12,8 @@ export interface ElectronAPI {
   }
   getConfig(): Promise<DesktopConfig>
   notify(title: string, body: string): Promise<boolean>
+  openFileDialog(): Promise<string[] | null>
+  checkOnline(): Promise<boolean>
 }
 
 declare global {
@@ -36,4 +38,14 @@ export async function getElectronConfig(): Promise<DesktopConfig | undefined> {
 export async function sendElectronNotification(title: string, body: string): Promise<boolean> {
   if (!isElectron()) return false
   return window.electron!.notify(title, body)
+}
+
+export async function openElectronFileDialog(): Promise<string[] | null> {
+  if (!isElectron()) return null
+  return window.electron!.openFileDialog()
+}
+
+export async function isElectronOnline(): Promise<boolean> {
+  if (!isElectron()) return true
+  return window.electron!.checkOnline()
 }
