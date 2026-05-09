@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
+import { searchApi } from '@/lib/api'
+import type { SearchResponse } from '@/lib/api/dto'
 import {
   Search,
   StickyNote,
@@ -30,27 +32,90 @@ export function Overlay() {
   const router = useRouter()
   const isOverlayOpen = useAppStore((state) => state.isOverlayOpen)
   const setOverlayOpen = useAppStore((state) => state.setOverlayOpen)
-  const search = useAppStore((state) => state.search)
+  const localSearch = useAppStore((state) => state.search)
   const createNote = useAppStore((state) => state.createNote)
   const createTask = useAppStore((state) => state.createTask)
 
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<'search' | 'create-note' | 'create-task'>('search')
   const [newTitle, setNewTitle] = useState('')
+  const [apiResults, setApiResults] = useState<SearchResponse | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const searchResults = query.length >= 2 ? search(query) : null
+  // Local search fallback
+  const localResults = query.length >= 2 ? localSearch(query) : null
+
+  // Merge: prefer API results when available
+  const searchResults = apiResults
+    ? {
+        notes: apiResults.notes.map((n) => ({
+          id: n.id,
+          title: n.title,
+          content: '',
+          projectId: n.project_id,
+          tags: [] as string[],
+          isPinned: false,
+          createdAt: n.updated_at,
+          updatedAt: n.updated_at,
+        })),
+        tasks: apiResults.tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          description: '',
+          projectId: t.project_id,
+          status: t.status as 'todo' | 'in-progress' | 'done',
+          priority: 'medium' as const,
+          dueDate: null,
+          tags: [] as string[],
+          createdAt: t.updated_at,
+          updatedAt: t.updated_at,
+        })),
+        projects: apiResults.projects.map((p) => ({
+          id: p.id,
+          name: p.title,
+          description: '',
+          color: '#3b82f6',
+          icon: 'folder',
+          createdAt: p.updated_at,
+          updatedAt: p.updated_at,
+        })),
+        files: [] as typeof localResults extends null ? never[] : NonNullable<typeof localResults>['files'],
+      }
+    : localResults
+
   const hasResults = searchResults && (
     searchResults.notes.length > 0 ||
     searchResults.tasks.length > 0 ||
     searchResults.projects.length > 0 ||
-    searchResults.files.length > 0
+    (searchResults.files && searchResults.files.length > 0)
   )
+
+  // Debounced backend search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (query.length < 2) {
+      setApiResults(null)
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await searchApi.search(query)
+        setApiResults(res)
+      } catch {
+        setApiResults(null)
+      }
+    }, 300)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [query])
 
   const handleClose = useCallback(() => {
     setOverlayOpen(false)
     setQuery('')
     setMode('search')
     setNewTitle('')
+    setApiResults(null)
   }, [setOverlayOpen])
 
   const quickActions: QuickAction[] = [
@@ -90,34 +155,32 @@ export function Overlay() {
     },
   ]
 
-  const handleCreateNote = () => {
-    if (newTitle.trim()) {
-      const note = createNote({
-        title: newTitle.trim(),
-        content: '',
-        projectId: null,
-        tags: [],
-        isPinned: false,
-      })
-      router.push(`/notes/${note.id}`)
-      handleClose()
-    }
+  const handleCreateNote = async () => {
+    if (!newTitle.trim()) return
+    const note = await createNote({
+      title: newTitle.trim(),
+      content: '',
+      projectId: null,
+      tags: [],
+      isPinned: false,
+    })
+    router.push(`/notes/${note.id}`)
+    handleClose()
   }
 
-  const handleCreateTask = () => {
-    if (newTitle.trim()) {
-      createTask({
-        title: newTitle.trim(),
-        description: '',
-        projectId: null,
-        status: 'todo',
-        priority: 'medium',
-        dueDate: null,
-        tags: [],
-      })
-      router.push('/tasks')
-      handleClose()
-    }
+  const handleCreateTask = async () => {
+    if (!newTitle.trim()) return
+    await createTask({
+      title: newTitle.trim(),
+      description: '',
+      projectId: null,
+      status: 'todo',
+      priority: 'medium',
+      dueDate: null,
+      tags: [],
+    })
+    router.push('/tasks')
+    handleClose()
   }
 
   // Global keyboard shortcut
@@ -128,7 +191,6 @@ export function Overlay() {
         setOverlayOpen(!isOverlayOpen)
       }
     }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOverlayOpen, setOverlayOpen])
@@ -136,13 +198,11 @@ export function Overlay() {
   // Quick action shortcuts when overlay is open
   useEffect(() => {
     if (!isOverlayOpen || mode !== 'search') return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         handleClose()
         return
       }
-
       const action = quickActions.find(
         (a) => a.shortcut?.toLowerCase() === e.key.toLowerCase() && !e.ctrlKey && !e.metaKey
       )
@@ -151,16 +211,15 @@ export function Overlay() {
         action.action()
       }
     }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOverlayOpen, mode, query, quickActions, handleClose])
 
   return (
     <Dialog open={isOverlayOpen} onOpenChange={setOverlayOpen}>
-      <DialogContent showCloseButton = {false} className="max-w-2xl gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogContent showCloseButton={false} className="max-w-2xl gap-0 overflow-hidden p-0 sm:rounded-xl">
         <DialogTitle className="sr-only">Быстрые действия и поиск</DialogTitle>
-        
+
         {mode === 'search' && (
           <>
             <div className="flex items-center gap-3 border-b border-border px-4">
@@ -172,11 +231,7 @@ export function Overlay() {
                 className="h-14 border-0 bg-transparent text-base shadow-none focus-visible:ring-0"
                 autoFocus
               />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleClose}
-              >
+              <Button variant="ghost" size="icon-sm" onClick={handleClose}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -219,16 +274,11 @@ export function Overlay() {
                 <div className="p-2">
                   {searchResults.notes.length > 0 && (
                     <div className="mb-2">
-                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                        Заметки
-                      </p>
+                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Заметки</p>
                       {searchResults.notes.slice(0, 3).map((note) => (
                         <button
                           key={note.id}
-                          onClick={() => {
-                            router.push(`/notes/${note.id}`)
-                            handleClose()
-                          }}
+                          onClick={() => { router.push(`/notes/${note.id}`); handleClose() }}
                           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent transition-colors"
                         >
                           <StickyNote className="h-4 w-4 text-muted-foreground" />
@@ -241,16 +291,11 @@ export function Overlay() {
 
                   {searchResults.tasks.length > 0 && (
                     <div className="mb-2">
-                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                        Задачи
-                      </p>
+                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Задачи</p>
                       {searchResults.tasks.slice(0, 3).map((task) => (
                         <button
                           key={task.id}
-                          onClick={() => {
-                            router.push('/tasks')
-                            handleClose()
-                          }}
+                          onClick={() => { router.push('/tasks'); handleClose() }}
                           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent transition-colors"
                         >
                           <CheckSquare className={cn(
@@ -271,22 +316,14 @@ export function Overlay() {
 
                   {searchResults.projects.length > 0 && (
                     <div className="mb-2">
-                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                        Проекты
-                      </p>
+                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Проекты</p>
                       {searchResults.projects.slice(0, 3).map((project) => (
                         <button
                           key={project.id}
-                          onClick={() => {
-                            router.push(`/projects/${project.id}`)
-                            handleClose()
-                          }}
+                          onClick={() => { router.push(`/projects/${project.id}`); handleClose() }}
                           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent transition-colors"
                         >
-                          <div
-                            className="h-3 w-3 rounded"
-                            style={{ backgroundColor: project.color }}
-                          />
+                          <div className="h-3 w-3 rounded" style={{ backgroundColor: project.color }} />
                           <span className="truncate text-sm text-foreground">{project.name}</span>
                           <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
                         </button>
@@ -294,18 +331,13 @@ export function Overlay() {
                     </div>
                   )}
 
-                  {searchResults.files.length > 0 && (
+                  {localResults && localResults.files.length > 0 && (
                     <div>
-                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                        Файлы
-                      </p>
-                      {searchResults.files.slice(0, 3).map((file) => (
+                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Файлы</p>
+                      {localResults.files.slice(0, 3).map((file) => (
                         <button
                           key={file.id}
-                          onClick={() => {
-                            router.push('/files')
-                            handleClose()
-                          }}
+                          onClick={() => { router.push('/files'); handleClose() }}
                           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent transition-colors"
                         >
                           <Files className="h-4 w-4 text-muted-foreground" />
@@ -328,11 +360,7 @@ export function Overlay() {
                 <StickyNote className="h-5 w-5 text-muted-foreground" />
                 <span className="font-medium text-foreground">Новая заметка</span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setMode('search')}
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => setMode('search')}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -342,14 +370,10 @@ export function Overlay() {
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Название заметки"
                 autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateNote()
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateNote() }}
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setMode('search')}>
-                  Отмена
-                </Button>
+                <Button variant="outline" onClick={() => setMode('search')}>Отмена</Button>
                 <Button onClick={handleCreateNote} disabled={!newTitle.trim()}>
                   <Plus className="h-4 w-4" />
                   Создать
@@ -366,11 +390,7 @@ export function Overlay() {
                 <CheckSquare className="h-5 w-5 text-muted-foreground" />
                 <span className="font-medium text-foreground">Новая задача</span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setMode('search')}
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => setMode('search')}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -380,14 +400,10 @@ export function Overlay() {
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Название задачи"
                 autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateTask()
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTask() }}
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setMode('search')}>
-                  Отмена
-                </Button>
+                <Button variant="outline" onClick={() => setMode('search')}>Отмена</Button>
                 <Button onClick={handleCreateTask} disabled={!newTitle.trim()}>
                   <Plus className="h-4 w-4" />
                   Создать

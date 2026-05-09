@@ -55,8 +55,8 @@ export default function NotesPage() {
     return projects.find((p) => p.id === projectId)?.color
   }
 
-  const handleCreateNote = () => {
-    const note = createNote({
+  const handleCreateNote = async () => {
+    const note = await createNote({
       title: 'Новая заметка',
       content: '',
       projectId: null,

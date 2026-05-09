@@ -6,7 +6,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAppStore } from '@/lib/store'
+import { ApiError } from '@/lib/api'
 import { FileText, Loader2 } from 'lucide-react'
+
+const errorMessages: Record<string, string> = {
+  invalid_credentials: 'Неверный email или пароль',
+  token_invalid: 'Ошибка авторизации, попробуйте снова',
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,17 +26,29 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setIsLoading(true)
-
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    const success = login(email, password)
-    if (success) {
+    try {
+      await login(email, password)
       router.push('/space')
-    } else {
-      setError('Неверный email или пароль')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(errorMessages[err.code] ?? err.message)
+      } else {
+        setError('Не удалось подключиться к серверу')
+      }
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
+  }
+
+  const handleDemoLogin = async () => {
+    setError('')
+    setIsLoading(true)
+    try {
+      await login('demo@example.com', 'demo123')
+      router.push('/space')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -54,7 +72,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="demo@example.com"
+              placeholder="email@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -69,7 +87,7 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="demo123"
+              placeholder="Ваш пароль"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -93,10 +111,21 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-4 rounded-lg border border-border bg-muted/50 p-3">
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium">Демо-аккаунт:</span> demo@example.com / demo123
-          </p>
+        <div className="mt-4">
+          <div className="relative flex items-center gap-2 py-2">
+            <div className="flex-1 border-t border-border" />
+            <span className="text-xs text-muted-foreground">или</span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleDemoLogin}
+            disabled={isLoading}
+          >
+            Войти как демо
+          </Button>
         </div>
 
         <div className="mt-6 text-center">

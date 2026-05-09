@@ -6,7 +6,6 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
 import { Overlay } from '@/components/overlay'
 import { useAppStore } from '@/lib/store'
-import { seedMockData } from '@/lib/mock-data'
 
 export default function AppLayout({
   children,
@@ -15,19 +14,20 @@ export default function AppLayout({
 }) {
   const router = useRouter()
   const user = useAppStore((state) => state.user)
-  const store = useAppStore()
+  const loadProjects = useAppStore((state) => state.loadProjects)
+  const loadNotes = useAppStore((state) => state.loadNotes)
+  const loadTasks = useAppStore((state) => state.loadTasks)
 
-  // Seed mock data on first load
-  useEffect(() => {
-    seedMockData(store)
-  }, [store])
-
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!user) {
       router.push('/login')
+      return
     }
-  }, [user, router])
+    // Load fresh data from backend on app mount
+    loadProjects()
+    loadNotes()
+    loadTasks()
+  }, [user, router, loadProjects, loadNotes, loadTasks])
 
   if (!user) {
     return (

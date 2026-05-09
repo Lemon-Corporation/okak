@@ -1,0 +1,8 @@
+export { api, ApiError } from './client'
+export { authApi } from './auth'
+export { projectsApi } from './projects'
+export { notesApi } from './notes'
+export { tasksApi } from './tasks'
+export { filesApi } from './files'
+export { searchApi } from './search'
+export type * from './dto'

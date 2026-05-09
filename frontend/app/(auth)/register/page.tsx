@@ -6,7 +6,12 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAppStore } from '@/lib/store'
+import { ApiError } from '@/lib/api'
 import { FileText, Loader2 } from 'lucide-react'
+
+const errorMessages: Record<string, string> = {
+  email_taken: 'Этот email уже зарегистрирован',
+}
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -27,23 +32,24 @@ export default function RegisterPage() {
       return
     }
 
-    if (password.length < 6) {
-      setError('Пароль должен быть не менее 6 символов')
+    if (password.length < 8) {
+      setError('Пароль должен быть не менее 8 символов')
       return
     }
 
     setIsLoading(true)
-
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    const success = register(email, password, name)
-    if (success) {
+    try {
+      await register(email, password, name)
       router.push('/space')
-    } else {
-      setError('Этот email уже зарегистрирован')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(errorMessages[err.code] ?? err.message)
+      } else {
+        setError('Не удалось подключиться к серверу')
+      }
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
@@ -97,7 +103,7 @@ export default function RegisterPage() {
             <Input
               id="password"
               type="password"
-              placeholder="Минимум 6 символов"
+              placeholder="Минимум 8 символов"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

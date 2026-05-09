@@ -18,6 +18,80 @@ import type {
   UpdateFileItem,
 } from './types'
 import { generateId, now } from './utils'
+import { session } from './session'
+import { authApi, projectsApi, notesApi, tasksApi } from './api'
+import type { BackendProject, BackendNote, BackendTask } from './api/dto'
+import { PROJECT_COLORS } from './utils'
+
+// --- mappers ---
+
+function mapProject(p: BackendProject, color?: string): Project {
+  return {
+    id: p.id,
+    name: p.title,
+    description: p.description ?? '',
+    color: color ?? PROJECT_COLORS[0],
+    icon: 'folder',
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  }
+}
+
+function mapNote(n: BackendNote): Note {
+  return {
+    id: n.id,
+    title: n.title,
+    content: n.content ?? '',
+    projectId: n.project_id,
+    tags: n.tags.map((t) => t.name),
+    isPinned: false,
+    createdAt: n.created_at,
+    updatedAt: n.updated_at,
+  }
+}
+
+const backendStatusToFrontend: Record<string, Task['status']> = {
+  todo: 'todo',
+  in_progress: 'in-progress',
+  done: 'done',
+  backlog: 'todo',
+  cancelled: 'todo',
+}
+
+const frontendStatusToBackend: Record<Task['status'], string> = {
+  todo: 'todo',
+  'in-progress': 'in_progress',
+  done: 'done',
+}
+
+const backendPriorityToFrontend: Record<string, Task['priority']> = {
+  none: 'low',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  urgent: 'high',
+}
+
+const frontendPriorityToBackend: Record<Task['priority'], string> = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+}
+
+function mapTask(t: BackendTask): Task {
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description ?? '',
+    projectId: t.project_id,
+    status: backendStatusToFrontend[t.status] ?? 'todo',
+    priority: backendPriorityToFrontend[t.priority] ?? 'medium',
+    dueDate: t.due_at,
+    tags: [],
+    createdAt: t.created_at,
+    updatedAt: t.updated_at,
+  }
+}
 
 interface AppStore {
   // State
@@ -28,11 +102,17 @@ interface AppStore {
   files: FileItem[]
   isOverlayOpen: boolean
   sidebarCollapsed: boolean
+  isLoading: boolean
 
-  // Auth actions
-  login: (email: string, password: string) => boolean
-  register: (email: string, password: string, name: string) => boolean
+  // Auth actions (async — throw ApiError on failure)
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, name: string) => Promise<void>
   logout: () => void
+
+  // Data loading
+  loadProjects: () => Promise<void>
+  loadNotes: () => Promise<void>
+  loadTasks: () => Promise<void>
 
   // Overlay actions
   toggleOverlay: () => void
@@ -43,34 +123,34 @@ interface AppStore {
   setSidebarCollapsed: (collapsed: boolean) => void
 
   // Notes CRUD
-  createNote: (note: CreateNote) => Note
-  updateNote: (id: string, updates: UpdateNote) => void
-  deleteNote: (id: string) => void
+  createNote: (note: CreateNote) => Promise<Note>
+  updateNote: (id: string, updates: UpdateNote) => Promise<void>
+  deleteNote: (id: string) => Promise<void>
   getNoteById: (id: string) => Note | undefined
   getNotesByProject: (projectId: string | null) => Note[]
 
   // Tasks CRUD
-  createTask: (task: CreateTask) => Task
-  updateTask: (id: string, updates: UpdateTask) => void
-  deleteTask: (id: string) => void
+  createTask: (task: CreateTask) => Promise<Task>
+  updateTask: (id: string, updates: UpdateTask) => Promise<void>
+  deleteTask: (id: string) => Promise<void>
   getTaskById: (id: string) => Task | undefined
   getTasksByProject: (projectId: string | null) => Task[]
   getTasksByStatus: (status: Task['status']) => Task[]
 
   // Projects CRUD
-  createProject: (project: CreateProject) => Project
-  updateProject: (id: string, updates: UpdateProject) => void
-  deleteProject: (id: string) => void
+  createProject: (project: CreateProject) => Promise<Project>
+  updateProject: (id: string, updates: UpdateProject) => Promise<void>
+  deleteProject: (id: string) => Promise<void>
   getProjectById: (id: string) => Project | undefined
 
-  // Files CRUD
+  // Files CRUD (local only — upload handled via filesApi directly)
   createFile: (file: CreateFileItem) => FileItem
   updateFile: (id: string, updates: UpdateFileItem) => void
   deleteFile: (id: string) => void
   getFileById: (id: string) => FileItem | undefined
   getFilesByProject: (projectId: string | null) => FileItem[]
 
-  // Search
+  // Search (local)
   search: (query: string) => {
     notes: Note[]
     tasks: Task[]
@@ -79,13 +159,9 @@ interface AppStore {
   }
 }
 
-// Mock users database
-const mockUsers: Map<string, { password: string; user: User }> = new Map()
-
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       user: null,
       notes: [],
       tasks: [],
@@ -93,227 +169,302 @@ export const useAppStore = create<AppStore>()(
       files: [],
       isOverlayOpen: false,
       sidebarCollapsed: false,
+      isLoading: false,
 
-      // Auth
-      login: (email: string, password: string) => {
-        const stored = mockUsers.get(email)
-        if (stored && stored.password === password) {
-          set({ user: stored.user })
-          return true
-        }
-        // Demo account
+      // --- Auth ---
+
+      login: async (email, password) => {
         if (email === 'demo@example.com' && password === 'demo123') {
-          const user: User = {
-            id: generateId(),
-            email,
-            name: 'Demo User',
-            avatar: null,
-            plan: 'pro',
-            createdAt: now(),
-          }
-          set({ user })
-          return true
+          session.set('demo-token')
+          set({
+            user: {
+              id: 'demo',
+              email: 'demo@example.com',
+              name: 'Demo User',
+              avatar: null,
+              plan: 'free',
+              createdAt: new Date().toISOString(),
+            },
+          })
+          return
         }
-        return false
-      },
-
-      register: (email: string, password: string, name: string) => {
-        if (mockUsers.has(email)) {
-          return false
-        }
+        const res = await authApi.login(email, password)
+        session.set(res.access_token)
         const user: User = {
-          id: generateId(),
-          email,
-          name,
+          id: res.user.id,
+          email: res.user.email,
+          name: res.user.display_name,
           avatar: null,
           plan: 'free',
-          createdAt: now(),
+          createdAt: res.user.created_at,
         }
-        mockUsers.set(email, { password, user })
         set({ user })
-        return true
+      },
+
+      register: async (email, password, name) => {
+        const res = await authApi.register(email, password, name)
+        session.set(res.access_token)
+        const user: User = {
+          id: res.user.id,
+          email: res.user.email,
+          name: res.user.display_name,
+          avatar: null,
+          plan: 'free',
+          createdAt: res.user.created_at,
+        }
+        set({ user })
       },
 
       logout: () => {
-        set({ user: null })
+        session.clear()
+        set({ user: null, notes: [], tasks: [], projects: [], files: [] })
       },
 
-      // Overlay
-      toggleOverlay: () => set((state) => ({ isOverlayOpen: !state.isOverlayOpen })),
+      // --- Data loading ---
+
+      loadProjects: async () => {
+        try {
+          const res = await projectsApi.list({ limit: 100 })
+          const existing = get().projects
+          const colorMap = Object.fromEntries(existing.map((p) => [p.id, p.color]))
+          set({
+            projects: res.items.map((p) =>
+              mapProject(p, colorMap[p.id] ?? PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)])
+            ),
+          })
+        } catch {}
+      },
+
+      loadNotes: async () => {
+        try {
+          const res = await notesApi.list({ limit: 100 })
+          const existing = get().notes
+          const pinnedMap = Object.fromEntries(existing.map((n) => [n.id, n.isPinned]))
+          set({
+            notes: res.items.map((n) => ({ ...mapNote(n), isPinned: pinnedMap[n.id] ?? false })),
+          })
+        } catch {}
+      },
+
+      loadTasks: async () => {
+        try {
+          const res = await tasksApi.list({ limit: 100 })
+          set({ tasks: res.items.map(mapTask) })
+        } catch {}
+      },
+
+      // --- Overlay ---
+      toggleOverlay: () => set((s) => ({ isOverlayOpen: !s.isOverlayOpen })),
       setOverlayOpen: (open) => set({ isOverlayOpen: open }),
 
-      // Sidebar
-      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+      // --- Sidebar ---
+      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
-      // Notes
-      createNote: (noteData) => {
-        const note: Note = {
-          ...noteData,
-          id: generateId(),
-          createdAt: now(),
-          updatedAt: now(),
+      // --- Notes ---
+
+      createNote: async (noteData) => {
+        const projectId = noteData.projectId
+        if (projectId) {
+          try {
+            const created = await notesApi.create({
+              project_id: projectId,
+              title: noteData.title,
+              content: noteData.content,
+              status: 'draft',
+            })
+            const note = { ...mapNote(created), isPinned: noteData.isPinned }
+            set((s) => ({ notes: [note, ...s.notes] }))
+            return note
+          } catch {}
         }
-        set((state) => ({ notes: [note, ...state.notes] }))
+        // Fallback: local-only note (no project or API down)
+        const note: Note = { ...noteData, id: generateId(), createdAt: now(), updatedAt: now() }
+        set((s) => ({ notes: [note, ...s.notes] }))
         return note
       },
 
-      updateNote: (id, updates) => {
-        set((state) => ({
-          notes: state.notes.map((note) =>
-            note.id === id ? { ...note, ...updates, updatedAt: now() } : note
-          ),
+      updateNote: async (id, updates) => {
+        set((s) => ({
+          notes: s.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now() } : n)),
         }))
+        try {
+          await notesApi.update(id, {
+            title: updates.title,
+            content: updates.content,
+          })
+        } catch {}
       },
 
-      deleteNote: (id) => {
-        set((state) => ({ notes: state.notes.filter((note) => note.id !== id) }))
+      deleteNote: async (id) => {
+        set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }))
+        try {
+          await notesApi.delete(id)
+        } catch {}
       },
 
-      getNoteById: (id) => get().notes.find((note) => note.id === id),
+      getNoteById: (id) => get().notes.find((n) => n.id === id),
+      getNotesByProject: (projectId) => get().notes.filter((n) => n.projectId === projectId),
 
-      getNotesByProject: (projectId) =>
-        get().notes.filter((note) => note.projectId === projectId),
+      // --- Tasks ---
 
-      // Tasks
-      createTask: (taskData) => {
-        const task: Task = {
-          ...taskData,
-          id: generateId(),
-          createdAt: now(),
-          updatedAt: now(),
+      createTask: async (taskData) => {
+        const projectId = taskData.projectId
+        if (projectId) {
+          try {
+            const created = await tasksApi.create({
+              project_id: projectId,
+              title: taskData.title,
+              description: taskData.description,
+              status: frontendStatusToBackend[taskData.status] ?? 'todo',
+              priority: frontendPriorityToBackend[taskData.priority] ?? 'medium',
+              due_at: taskData.dueDate,
+            })
+            const task = mapTask(created)
+            set((s) => ({ tasks: [task, ...s.tasks] }))
+            return task
+          } catch {}
         }
-        set((state) => ({ tasks: [task, ...state.tasks] }))
+        const task: Task = { ...taskData, id: generateId(), createdAt: now(), updatedAt: now() }
+        set((s) => ({ tasks: [task, ...s.tasks] }))
         return task
       },
 
-      updateTask: (id, updates) => {
-        set((state) => ({
-          tasks: state.tasks.map((task) =>
-            task.id === id ? { ...task, ...updates, updatedAt: now() } : task
-          ),
+      updateTask: async (id, updates) => {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: now() } : t)),
         }))
+        try {
+          const backendUpdates: Record<string, unknown> = {}
+          if (updates.title !== undefined) backendUpdates.title = updates.title
+          if (updates.description !== undefined) backendUpdates.description = updates.description
+          if (updates.status !== undefined) backendUpdates.status = frontendStatusToBackend[updates.status]
+          if (updates.priority !== undefined) backendUpdates.priority = frontendPriorityToBackend[updates.priority]
+          if (updates.dueDate !== undefined) backendUpdates.due_at = updates.dueDate
+          await tasksApi.update(id, backendUpdates)
+        } catch {}
       },
 
-      deleteTask: (id) => {
-        set((state) => ({ tasks: state.tasks.filter((task) => task.id !== id) }))
+      deleteTask: async (id) => {
+        set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+        try {
+          await tasksApi.delete(id)
+        } catch {}
       },
 
-      getTaskById: (id) => get().tasks.find((task) => task.id === id),
+      getTaskById: (id) => get().tasks.find((t) => t.id === id),
+      getTasksByProject: (projectId) => get().tasks.filter((t) => t.projectId === projectId),
+      getTasksByStatus: (status) => get().tasks.filter((t) => t.status === status),
 
-      getTasksByProject: (projectId) =>
-        get().tasks.filter((task) => task.projectId === projectId),
+      // --- Projects ---
 
-      getTasksByStatus: (status) =>
-        get().tasks.filter((task) => task.status === status),
-
-      // Projects
-      createProject: (projectData) => {
-        const project: Project = {
-          ...projectData,
-          id: generateId(),
-          createdAt: now(),
-          updatedAt: now(),
+      createProject: async (projectData) => {
+        try {
+          const created = await projectsApi.create({
+            kind: 'project',
+            title: projectData.name,
+            description: projectData.description,
+            status: 'active',
+          })
+          const project = mapProject(created, projectData.color)
+          set((s) => ({ projects: [project, ...s.projects] }))
+          return project
+        } catch {
+          const project: Project = { ...projectData, id: generateId(), createdAt: now(), updatedAt: now() }
+          set((s) => ({ projects: [project, ...s.projects] }))
+          return project
         }
-        set((state) => ({ projects: [project, ...state.projects] }))
-        return project
       },
 
-      updateProject: (id, updates) => {
-        set((state) => ({
-          projects: state.projects.map((project) =>
-            project.id === id ? { ...project, ...updates, updatedAt: now() } : project
-          ),
+      updateProject: async (id, updates) => {
+        set((s) => ({
+          projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates, updatedAt: now() } : p)),
         }))
+        try {
+          if (updates.name || updates.description) {
+            await projectsApi.update(id, {
+              title: updates.name,
+              description: updates.description,
+            })
+          }
+        } catch {}
       },
 
-      deleteProject: (id) => {
-        set((state) => ({
-          projects: state.projects.filter((project) => project.id !== id),
-          // Also remove project association from related items
-          notes: state.notes.map((note) =>
-            note.projectId === id ? { ...note, projectId: null } : note
-          ),
-          tasks: state.tasks.map((task) =>
-            task.projectId === id ? { ...task, projectId: null } : task
-          ),
-          files: state.files.map((file) =>
-            file.projectId === id ? { ...file, projectId: null } : file
-          ),
+      deleteProject: async (id) => {
+        set((s) => ({
+          projects: s.projects.filter((p) => p.id !== id),
+          notes: s.notes.map((n) => (n.projectId === id ? { ...n, projectId: null } : n)),
+          tasks: s.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null } : t)),
+          files: s.files.map((f) => (f.projectId === id ? { ...f, projectId: null } : f)),
         }))
+        try {
+          await projectsApi.delete(id)
+        } catch {}
       },
 
-      getProjectById: (id) => get().projects.find((project) => project.id === id),
+      getProjectById: (id) => get().projects.find((p) => p.id === id),
 
-      // Files
+      // --- Files (local only; use filesApi for actual upload) ---
+
       createFile: (fileData) => {
-        const file: FileItem = {
-          ...fileData,
-          id: generateId(),
-          createdAt: now(),
-          updatedAt: now(),
-        }
-        set((state) => ({ files: [file, ...state.files] }))
+        const file: FileItem = { ...fileData, id: generateId(), createdAt: now(), updatedAt: now() }
+        set((s) => ({ files: [file, ...s.files] }))
         return file
       },
 
       updateFile: (id, updates) => {
-        set((state) => ({
-          files: state.files.map((file) =>
-            file.id === id ? { ...file, ...updates, updatedAt: now() } : file
-          ),
+        set((s) => ({
+          files: s.files.map((f) => (f.id === id ? { ...f, ...updates, updatedAt: now() } : f)),
         }))
       },
 
       deleteFile: (id) => {
-        set((state) => ({ files: state.files.filter((file) => file.id !== id) }))
+        set((s) => ({ files: s.files.filter((f) => f.id !== id) }))
       },
 
-      getFileById: (id) => get().files.find((file) => file.id === id),
+      getFileById: (id) => get().files.find((f) => f.id === id),
+      getFilesByProject: (projectId) => get().files.filter((f) => f.projectId === projectId),
 
-      getFilesByProject: (projectId) =>
-        get().files.filter((file) => file.projectId === projectId),
+      // --- Search (local) ---
 
-      // Search
       search: (query) => {
         const q = query.toLowerCase()
-        const state = get()
-
+        const s = get()
         return {
-          notes: state.notes.filter(
-            (note) =>
-              note.title.toLowerCase().includes(q) ||
-              note.content.toLowerCase().includes(q) ||
-              note.tags.some((tag) => tag.toLowerCase().includes(q))
+          notes: s.notes.filter(
+            (n) =>
+              n.title.toLowerCase().includes(q) ||
+              n.content.toLowerCase().includes(q) ||
+              n.tags.some((t) => t.toLowerCase().includes(q))
           ),
-          tasks: state.tasks.filter(
-            (task) =>
-              task.title.toLowerCase().includes(q) ||
-              task.description.toLowerCase().includes(q) ||
-              task.tags.some((tag) => tag.toLowerCase().includes(q))
+          tasks: s.tasks.filter(
+            (t) =>
+              t.title.toLowerCase().includes(q) ||
+              t.description.toLowerCase().includes(q) ||
+              t.tags.some((tag) => tag.toLowerCase().includes(q))
           ),
-          projects: state.projects.filter(
-            (project) =>
-              project.name.toLowerCase().includes(q) ||
-              project.description.toLowerCase().includes(q)
+          projects: s.projects.filter(
+            (p) =>
+              p.name.toLowerCase().includes(q) ||
+              p.description.toLowerCase().includes(q)
           ),
-          files: state.files.filter(
-            (file) =>
-              file.name.toLowerCase().includes(q) ||
-              file.tags.some((tag) => tag.toLowerCase().includes(q))
+          files: s.files.filter(
+            (f) =>
+              f.name.toLowerCase().includes(q) ||
+              f.tags.some((t) => t.toLowerCase().includes(q))
           ),
         }
       },
     }),
     {
       name: 'app-storage',
-      partialize: (state) => ({
-        user: state.user,
-        notes: state.notes,
-        tasks: state.tasks,
-        projects: state.projects,
-        files: state.files,
-        sidebarCollapsed: state.sidebarCollapsed,
+      partialize: (s) => ({
+        user: s.user,
+        notes: s.notes,
+        tasks: s.tasks,
+        projects: s.projects,
+        files: s.files,
+        sidebarCollapsed: s.sidebarCollapsed,
       }),
     }
   )

@@ -65,8 +65,8 @@ export default function ProjectDetailPage() {
     router.push('/projects')
   }
 
-  const handleCreateNote = () => {
-    const note = createNote({
+  const handleCreateNote = async () => {
+    const note = await createNote({
       title: 'Новая заметка',
       content: '',
       projectId: projectId,
