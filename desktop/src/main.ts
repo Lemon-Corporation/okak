@@ -153,6 +153,17 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Handle file drag & drop
+  mainWindow.webContents.on('dom-ready', () => {
+    mainWindow?.webContents.executeJavaScript(`
+      document.addEventListener('dragover', (e) => { e.preventDefault(); return false; })
+      document.addEventListener('drop', (e) => {
+        e.preventDefault()
+        return false
+      })
+    `)
+  })
+
   // Save window state on resize/move
   const saveBounds = () => {
     if (mainWindow) {

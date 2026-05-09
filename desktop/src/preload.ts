@@ -9,6 +9,10 @@ const api = {
   },
   getConfig: () => ipcRenderer.invoke('app:get-config'),
   notify: (title: string, body: string) => ipcRenderer.invoke('app:notify', { title, body }),
+  onFileDrop: (callback: (files: Array<{ name: string; path: string; size: number; type: string }>) => void) => {
+    ipcRenderer.removeAllListeners('app:file-drop')
+    ipcRenderer.on('app:file-drop', (_event, files) => callback(files))
+  },
 }
 
 contextBridge.exposeInMainWorld('electron', api)
