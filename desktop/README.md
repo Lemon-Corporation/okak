@@ -146,6 +146,32 @@ autoUpdater.checkForUpdatesAndNotify()
 
 **Настройка:** `electron-builder.yml` → `publish: github` (owner: Lemon-Corporation, repo: okak)
 
+## Windows Code Signing (убрать SmartScreen)
+
+Чтобы на Windows не было "Неизвестный издатель" / SmartScreen:
+
+### SignPath.io (бесплатно для Open Source)
+
+1. Зарегистрируйся на [SignPath.io](https://about.signpath.io/product/open-source)
+2. Создай организацию и проект `okak`
+3. Подай заявку на **Open Source Code Signing** (требуется публичный репозиторий)
+4. После одобрения получи:
+   - `Organization Slug`
+   - `Signing Policy Slug` (например `test-signing` или `release-signing`)
+   - API Token
+
+5. Добавь секреты в основной репозиторий `okak`:
+   - `SIGNPATH_API_TOKEN` — API токен
+   - `SIGNPATH_ORG_SLUG` — slug организации
+   - `SIGNPATH_POLICY_SLUG` — slug политики подписи
+
+CI автоматически подпишет `.exe` перед публикацией.
+
+### Альтернативы
+
+- **Certum Open Source** — ~25 EUR/год, EV-сертификат
+- **DigiCert/CodeGate** — платный, от $200/год
+
 ## Known Issues
 
 - Файловые сценарии (upload/download) тестировались только в dev-режиме через `localhost`.

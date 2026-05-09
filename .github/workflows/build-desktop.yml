@@ -68,6 +68,20 @@ jobs:
       - name: Build NSIS
         run: cd desktop; npx electron-builder --win nsis --publish never
 
+      - name: Sign with SignPath (if configured)
+        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        run: |
+          cd desktop/release
+          for f in *.exe; do
+            curl -X POST https://app.signpath.io/api/v1/${{ secrets.SIGNPATH_ORG_SLUG }}/SigningRequests \
+              -H "Authorization: Bearer ${{ secrets.SIGNPATH_API_TOKEN }}" \
+              -F "File=@$f" \
+              -F "SigningPolicySlug=${{ secrets.SIGNPATH_POLICY_SLUG }}" \
+              -o "$f.signed"
+            mv "$f.signed" "$f"
+          done
+        continue-on-error: true
+
       - name: Publish to okak-release
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop; npx electron-builder --win nsis --publish always
