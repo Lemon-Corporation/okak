@@ -14,6 +14,15 @@ export interface ElectronAPI {
   notify(title: string, body: string): Promise<boolean>
   openFileDialog(): Promise<string[] | null>
   checkOnline(): Promise<boolean>
+  setProgressBar(value: number): Promise<void>
+  setBadge(count: number): Promise<void>
+  setAutoLaunch(enable: boolean): Promise<boolean>
+  getAutoLaunch(): Promise<boolean>
+  zoomIn(): Promise<void>
+  zoomOut(): Promise<void>
+  zoomReset(): Promise<void>
+  print(): Promise<void>
+  toggleFullscreen(): Promise<void>
 }
 
 declare global {

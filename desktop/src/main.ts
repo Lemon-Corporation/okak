@@ -9,6 +9,7 @@ import {
   Notification,
   globalShortcut,
   dialog,
+  nativeTheme,
   type MenuItemConstructorOptions,
   type HandlerDetails,
 } from 'electron'
@@ -364,6 +365,89 @@ ipcMain.handle('app:check-online', async () => {
   }
 })
 
+// Progress bar on taskbar / dock
+ipcMain.handle('app:set-progress-bar', (_event, value: number) => {
+  if (mainWindow) {
+    // value: -1 = remove, 0-1 = progress
+    mainWindow.setProgressBar(value === -1 ? -1 : value)
+  }
+})
+
+// Badge counter on dock / taskbar
+ipcMain.handle('app:set-badge', (_event, count: number) => {
+  if (process.platform === 'darwin') {
+    app.setBadgeCount(count)
+  } else if (mainWindow) {
+    // Windows overlay icon or badge
+    if (count > 0) {
+      // Simple approach: set overlay icon (or use overlay badge)
+      // For now, just log it
+      log.info('[badge] set badge count:', count)
+    }
+  }
+})
+
+// Auto-launch on system startup
+ipcMain.handle('app:set-auto-launch', (_event, enable: boolean) => {
+  app.setLoginItemSettings({
+    openAtLogin: enable,
+    openAsHidden: false,
+  })
+  return enable
+})
+
+ipcMain.handle('app:get-auto-launch', () => {
+  return app.getLoginItemSettings().openAtLogin
+})
+
+// Zoom controls
+ipcMain.handle('app:zoom-in', () => {
+  if (mainWindow) {
+    const current = mainWindow.webContents.getZoomLevel()
+    mainWindow.webContents.setZoomLevel(current + 0.5)
+  }
+})
+
+ipcMain.handle('app:zoom-out', () => {
+  if (mainWindow) {
+    const current = mainWindow.webContents.getZoomLevel()
+    mainWindow.webContents.setZoomLevel(current - 0.5)
+  }
+})
+
+ipcMain.handle('app:zoom-reset', () => {
+  if (mainWindow) {
+    mainWindow.webContents.setZoomLevel(0)
+  }
+})
+
+// Print
+ipcMain.handle('app:print', () => {
+  if (mainWindow) {
+    mainWindow.webContents.print({ silent: false, printBackground: true })
+  }
+})
+
+// Fullscreen toggle
+ipcMain.handle('app:toggle-fullscreen', () => {
+  if (mainWindow) {
+    mainWindow.setFullScreen(!mainWindow.isFullScreen())
+  }
+})
+
+// Dark mode
+ipcMain.handle('app:get-dark-mode', () => nativeTheme.shouldUseDarkColors)
+
+ipcMain.handle('app:set-dark-mode', (_event, enable: boolean) => {
+  nativeTheme.themeSource = enable ? 'dark' : 'light'
+})
+
+nativeTheme.on('updated', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('app:dark-mode-changed', nativeTheme.shouldUseDarkColors)
+  }
+})
+
 // Deep link handler
 app.on('open-url', (event, url) => {
   event.preventDefault()
@@ -382,7 +466,14 @@ app.on('ready', () => {
   createTray()
   Menu.setApplicationMenu(buildMenu())
 
-  // Global shortcut to show/hide window
+  // Global shortcuts
+  globalShortcut.register('CommandOrControl+0', () => {
+    if (mainWindow) mainWindow.webContents.setZoomLevel(0)
+  })
+  globalShortcut.register('F11', () => {
+    if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen())
+  })
+
   const shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+O', () => {
     if (mainWindow) {
       if (mainWindow.isVisible()) {
