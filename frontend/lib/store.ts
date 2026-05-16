@@ -15,7 +15,7 @@ import type {
   UpdateProject,
 } from './types'
 import { now } from './utils'
-import { authApi, projectsApi, notesApi, tasksApi, filesApi, tagsApi } from './api'
+import { authApi, projectsApi, notesApi, tasksApi, filesApi } from './api'
 import type { BackendProject, BackendNote, BackendTask } from './api/dto'
 import { PROJECT_COLORS } from './utils'
 
@@ -102,7 +102,7 @@ interface AppStore {
   loading: { projects: boolean; notes: boolean; tasks: boolean; files: boolean }
   errors: { projects: string | null; notes: string | null; tasks: string | null; files: string | null }
 
-  // Auth actions (async — throw ApiError on failure)
+  // Auth actions
   loadUser: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name: string) => Promise<void>
@@ -178,12 +178,16 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
       set({ user })
     } catch {
+      localStorage.removeItem('okak_access_token')
       set({ user: null })
     }
   },
 
   login: async (email, password) => {
     const res = await authApi.login(email, password)
+
+    localStorage.setItem('okak_access_token', res.access_token)
+
     const user: User = {
       id: res.user.id,
       email: res.user.email,
@@ -192,11 +196,15 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       plan: (res.user.plan as 'free' | 'pro' | 'team') || 'free',
       createdAt: res.user.created_at,
     }
+
     set({ user })
   },
 
   register: async (email, password, name) => {
     const res = await authApi.register(email, password, name)
+
+    localStorage.setItem('okak_access_token', res.access_token)
+
     const user: User = {
       id: res.user.id,
       email: res.user.email,
@@ -205,6 +213,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       plan: (res.user.plan as 'free' | 'pro' | 'team') || 'free',
       createdAt: res.user.created_at,
     }
+
     set({ user })
   },
 
@@ -212,6 +221,9 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     try {
       await authApi.logout()
     } catch {}
+
+    localStorage.removeItem('okak_access_token')
+
     set({ user: null, notes: [], tasks: [], projects: [], files: [] })
   },
 
@@ -227,6 +239,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       loading: { ...s.loading, projects: true },
       errors: { ...s.errors, projects: null },
     }))
+
     try {
       const res = await projectsApi.list({ limit: 100 })
       set((s) => ({
@@ -254,6 +267,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       loading: { ...s.loading, notes: true },
       errors: { ...s.errors, notes: null },
     }))
+
     try {
       const res = await notesApi.list({ limit: 100 })
       set((s) => ({
@@ -281,9 +295,13 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       loading: { ...s.loading, tasks: true },
       errors: { ...s.errors, tasks: null },
     }))
+
     try {
       const res = await tasksApi.list({ limit: 100 })
-      set((s) => ({ tasks: res.items.map(mapTask), errors: { ...s.errors, tasks: null } }))
+      set((s) => ({
+        tasks: res.items.map(mapTask),
+        errors: { ...s.errors, tasks: null },
+      }))
     } catch (err) {
       set((s) => ({
         errors: {
@@ -305,11 +323,14 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       loading: { ...s.loading, files: true },
       errors: { ...s.errors, files: null },
     }))
+
     try {
       const projects = get().projects
       const allFiles: FileItem[] = []
+
       for (const project of projects) {
         const res = await projectsApi.getFiles(project.id)
+
         for (const f of res.items) {
           allFiles.push({
             id: f.id,
@@ -324,7 +345,11 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           })
         }
       }
-      set((s) => ({ files: allFiles, errors: { ...s.errors, files: null } }))
+
+      set((s) => ({
+        files: allFiles,
+        errors: { ...s.errors, files: null },
+      }))
     } catch (err) {
       set((s) => ({
         errors: {
@@ -341,10 +366,12 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   },
 
   // --- Overlay ---
+
   toggleOverlay: () => set((s) => ({ isOverlayOpen: !s.isOverlayOpen })),
   setOverlayOpen: (open) => set({ isOverlayOpen: open }),
 
   // --- Sidebar ---
+
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
@@ -352,7 +379,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
   createNote: async (noteData) => {
     const projectId = noteData.projectId
-    if (!projectId) throw new Error('Заметка должна принадлежать проекту')
+    if (!projectId) {
+      throw new Error('Заметка должна принадлежать проекту')
+    }
+
     const created = await notesApi.create({
       project_id: projectId,
       title: noteData.title,
@@ -360,8 +390,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       status: 'draft',
       is_pinned: noteData.isPinned ?? false,
     })
+
     const note = mapNote(created)
     set((s) => ({ notes: [note, ...s.notes] }))
+
     return note
   },
 
@@ -369,17 +401,29 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set((s) => ({
       notes: s.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now() } : n)),
     }))
+
     try {
       const body: Record<string, unknown> = {}
-      if (updates.title !== undefined) body.title = updates.title
-      if (updates.content !== undefined) body.content = updates.content
-      if (updates.isPinned !== undefined) body.is_pinned = updates.isPinned
+
+      if (updates.title !== undefined) {
+        body.title = updates.title
+      }
+
+      if (updates.content !== undefined) {
+        body.content = updates.content
+      }
+
+      if (updates.isPinned !== undefined) {
+        body.is_pinned = updates.isPinned
+      }
+
       await notesApi.update(id, body)
     } catch {}
   },
 
   deleteNote: async (id) => {
     set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }))
+
     try {
       await notesApi.delete(id)
     } catch {}
@@ -392,7 +436,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
   createTask: async (taskData) => {
     const projectId = taskData.projectId
-    if (!projectId) throw new Error('Задача должна принадлежать проекту')
+    if (!projectId) {
+      throw new Error('Задача должна принадлежать проекту')
+    }
+
     const created = await tasksApi.create({
       project_id: projectId,
       title: taskData.title,
@@ -401,8 +448,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       priority: frontendPriorityToBackend[taskData.priority] ?? 'medium',
       due_at: taskData.dueDate,
     })
+
     const task = mapTask(created)
     set((s) => ({ tasks: [task, ...s.tasks] }))
+
     return task
   },
 
@@ -410,19 +459,37 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set((s) => ({
       tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: now() } : t)),
     }))
+
     try {
       const backendUpdates: Record<string, unknown> = {}
-      if (updates.title !== undefined) backendUpdates.title = updates.title
-      if (updates.description !== undefined) backendUpdates.description = updates.description
-      if (updates.status !== undefined) backendUpdates.status = frontendStatusToBackend[updates.status]
-      if (updates.priority !== undefined) backendUpdates.priority = frontendPriorityToBackend[updates.priority]
-      if (updates.dueDate !== undefined) backendUpdates.due_at = updates.dueDate
+
+      if (updates.title !== undefined) {
+        backendUpdates.title = updates.title
+      }
+
+      if (updates.description !== undefined) {
+        backendUpdates.description = updates.description
+      }
+
+      if (updates.status !== undefined) {
+        backendUpdates.status = frontendStatusToBackend[updates.status]
+      }
+
+      if (updates.priority !== undefined) {
+        backendUpdates.priority = frontendPriorityToBackend[updates.priority]
+      }
+
+      if (updates.dueDate !== undefined) {
+        backendUpdates.due_at = updates.dueDate
+      }
+
       await tasksApi.update(id, backendUpdates)
     } catch {}
   },
 
   deleteTask: async (id) => {
     set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+
     try {
       await tasksApi.delete(id)
     } catch {}
@@ -442,8 +509,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       color: projectData.color,
       status: 'active',
     })
+
     const project = mapProject(created)
     set((s) => ({ projects: [project, ...s.projects] }))
+
     return project
   },
 
@@ -451,11 +520,22 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set((s) => ({
       projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates, updatedAt: now() } : p)),
     }))
+
     try {
       const body: Record<string, unknown> = {}
-      if (updates.name !== undefined) body.title = updates.name
-      if (updates.description !== undefined) body.description = updates.description
-      if (updates.color !== undefined) body.color = updates.color
+
+      if (updates.name !== undefined) {
+        body.title = updates.name
+      }
+
+      if (updates.description !== undefined) {
+        body.description = updates.description
+      }
+
+      if (updates.color !== undefined) {
+        body.color = updates.color
+      }
+
       if (Object.keys(body).length > 0) {
         await projectsApi.update(id, body)
       }
@@ -469,6 +549,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       tasks: s.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null } : t)),
       files: s.files.map((f) => (f.projectId === id ? { ...f, projectId: null } : f)),
     }))
+
     try {
       await projectsApi.delete(id)
     } catch {}
@@ -480,6 +561,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
   createFile: async (file, projectId) => {
     const uploaded = await filesApi.upload(file, projectId)
+
     const fileItem: FileItem = {
       id: uploaded.id,
       name: uploaded.original_name,
@@ -491,12 +573,15 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       createdAt: uploaded.created_at,
       updatedAt: uploaded.updated_at,
     }
+
     set((s) => ({ files: [fileItem, ...s.files] }))
+
     return fileItem
   },
 
   deleteFile: async (id) => {
     set((s) => ({ files: s.files.filter((f) => f.id !== id) }))
+
     try {
       await filesApi.delete(id)
     } catch {}

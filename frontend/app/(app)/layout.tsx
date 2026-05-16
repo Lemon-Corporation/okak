@@ -13,7 +13,7 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [hasHydrated, setHasHydrated] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   const user = useAppStore((state) => state.user)
   const loadProjects = useAppStore((state) => state.loadProjects)
@@ -22,34 +22,32 @@ export default function AppLayout({
   const loadFiles = useAppStore((state) => state.loadFiles)
 
   useEffect(() => {
-    const unsub = useAppStore.persist.onFinishHydration(() => {
-      setHasHydrated(true)
-    })
-
-    setHasHydrated(useAppStore.persist.hasHydrated())
-
-    return unsub
+    setMounted(true)
   }, [])
 
   useEffect(() => {
-    if (!hasHydrated) {
+    if (!mounted) {
       return
     }
 
-    if (!user) {
+    const token = localStorage.getItem('okak_access_token')
+
+    if (!user && !token) {
       router.replace('/login')
       return
     }
 
-    // Load fresh data from backend on app mount
-    // Projects must load first since loadFiles iterates over projects
     void (async () => {
+      if (!user) {
+        await useAppStore.getState().loadUser()
+      }
+
       await loadProjects()
       await Promise.all([loadNotes(), loadTasks(), loadFiles()])
     })()
-  }, [hasHydrated, user, router, loadProjects, loadNotes, loadTasks, loadFiles])
+  }, [mounted, user, router, loadProjects, loadNotes, loadTasks, loadFiles])
 
-  if (!hasHydrated || !user) {
+  if (!mounted) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-muted-foreground">Загрузка...</div>
