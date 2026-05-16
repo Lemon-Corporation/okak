@@ -140,6 +140,15 @@ export default function NoteDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Закрыть заметку"
+              onClick={() => router.push('/notes')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">

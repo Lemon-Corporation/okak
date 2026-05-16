@@ -87,11 +87,6 @@ export function AppSidebar() {
               >
                 <Plus className="h-4 w-4" />
                 Быстрое создание
-
-                <kbd className="absolute -top-2 -right-2 flex h-6 items-center gap-1 rounded-md border border-white/20 bg-white/15 px-2 text-[10px] font-medium text-white/90 shadow-md backdrop-blur-md">
-                  <Command className="h-3 w-3" />
-                  Space
-                </kbd>
               </Button>
             </div>
           </SidebarGroupContent>
