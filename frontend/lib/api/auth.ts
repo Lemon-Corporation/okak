@@ -8,6 +8,9 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post<AuthResponse>('/auth/login', { email, password }, { skipAuth: true }),
 
+  logout: () =>
+    api.post<void>('/auth/logout'),
+
   me: () =>
     api.get<BackendUser>('/auth/me'),
 

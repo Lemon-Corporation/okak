@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Cookie, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +24,11 @@ async def get_container(
 async def get_current_user(
     container: Annotated[AppContainer, Depends(get_container)],
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    access_token: Annotated[str | None, Cookie()] = None,
 ) -> UserRecord:
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    token = access_token
+    if token is None and credentials is not None and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    if token is None:
         raise UserAppError(code="token_invalid", message="Not authenticated")
-    return await container.auth_service.get_current_user(credentials.credentials)
+    return await container.auth_service.get_current_user(token)
