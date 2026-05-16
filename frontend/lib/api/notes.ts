@@ -16,12 +16,14 @@ export interface CreateNoteBody {
   title: string
   content?: string
   status?: string
+  is_pinned?: boolean
 }
 
 export interface UpdateNoteBody {
   title?: string
   content?: string
   status?: string
+  is_pinned?: boolean
 }
 
 function qs(params: Record<string, unknown>): string {

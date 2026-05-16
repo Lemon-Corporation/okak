@@ -63,6 +63,7 @@ async def create_project(
             kind=body.kind,
             title=body.title,
             description=body.description,
+            color=body.color,
             parent_project_id=body.parent_project_id,
             status=body.status,
         )
@@ -94,6 +95,7 @@ async def update_project(
             owner_user_id=current_user.id,
             title=body.title,
             description=body.description,
+            color=body.color,
             status=body.status,
             kind=body.kind,
             parent_project_id=body.parent_project_id,

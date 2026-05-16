@@ -108,14 +108,14 @@ export default function LandingPage() {
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link href="/login">Открыть демо</Link>
+                <Link href="/login">Войти</Link>
               </Button>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-blue" />
-                Демо: demo@example.com / demo123
+                Бесплатный старт, без карты
               </span>
             </div>
           </div>

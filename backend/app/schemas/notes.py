@@ -20,6 +20,7 @@ class NoteResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     archived_at: datetime | None
+    is_pinned: bool = False
     tags: list[TagResponse] = Field(default_factory=list)
 
 
@@ -45,6 +46,7 @@ class NoteUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=255)
     content: str | None = None
     status: NoteStatus | None = None
+    is_pinned: bool | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -54,6 +56,7 @@ class CreateNoteCommand:
     title: str
     content: str
     status: NoteStatus
+    is_pinned: bool = False
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -62,6 +65,7 @@ class UpdateNoteCommand:
     title: str | None = None
     content: str | None = None
     status: NoteStatus | None = None
+    is_pinned: bool | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -11,26 +11,24 @@ import type {
   CreateNote,
   CreateTask,
   CreateProject,
-  CreateFileItem,
   UpdateNote,
   UpdateTask,
   UpdateProject,
-  UpdateFileItem,
 } from './types'
-import { generateId, now } from './utils'
+import { now } from './utils'
 import { session } from './session'
-import { authApi, projectsApi, notesApi, tasksApi } from './api'
+import { authApi, projectsApi, notesApi, tasksApi, filesApi, tagsApi } from './api'
 import type { BackendProject, BackendNote, BackendTask } from './api/dto'
 import { PROJECT_COLORS } from './utils'
 
 // --- mappers ---
 
-function mapProject(p: BackendProject, color?: string): Project {
+function mapProject(p: BackendProject): Project {
   return {
     id: p.id,
     name: p.title,
     description: p.description ?? '',
-    color: color ?? PROJECT_COLORS[0],
+    color: p.color || PROJECT_COLORS[0],
     icon: 'folder',
     createdAt: p.created_at,
     updatedAt: p.updated_at,
@@ -44,7 +42,7 @@ function mapNote(n: BackendNote): Note {
     content: n.content ?? '',
     projectId: n.project_id,
     tags: n.tags.map((t) => t.name),
-    isPinned: false,
+    isPinned: n.is_pinned,
     createdAt: n.created_at,
     updatedAt: n.updated_at,
   }
@@ -103,18 +101,20 @@ interface AppStore {
   isOverlayOpen: boolean
   sidebarCollapsed: boolean
   isLoading: boolean
-  loading: { projects: boolean; notes: boolean; tasks: boolean }
-  errors: { projects: string | null; notes: string | null; tasks: string | null }
+  loading: { projects: boolean; notes: boolean; tasks: boolean; files: boolean }
+  errors: { projects: string | null; notes: string | null; tasks: string | null; files: string | null }
 
   // Auth actions (async — throw ApiError on failure)
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name: string) => Promise<void>
   logout: () => void
+  updateUser: (updates: Partial<User>) => void
 
   // Data loading
   loadProjects: () => Promise<void>
   loadNotes: () => Promise<void>
   loadTasks: () => Promise<void>
+  loadFiles: () => Promise<void>
 
   // Overlay actions
   toggleOverlay: () => void
@@ -145,20 +145,11 @@ interface AppStore {
   deleteProject: (id: string) => Promise<void>
   getProjectById: (id: string) => Project | undefined
 
-  // Files CRUD (local only — upload handled via filesApi directly)
-  createFile: (file: CreateFileItem & { id?: string }) => FileItem
-  updateFile: (id: string, updates: UpdateFileItem) => void
-  deleteFile: (id: string) => void
+  // Files CRUD
+  createFile: (file: File, projectId: string) => Promise<FileItem>
+  deleteFile: (id: string) => Promise<void>
   getFileById: (id: string) => FileItem | undefined
   getFilesByProject: (projectId: string | null) => FileItem[]
-
-  // Search (local)
-  search: (query: string) => {
-    notes: Note[]
-    tasks: Task[]
-    projects: Project[]
-    files: FileItem[]
-  }
 }
 
 export const useAppStore = create<AppStore>()(
@@ -172,26 +163,12 @@ export const useAppStore = create<AppStore>()(
       isOverlayOpen: false,
       sidebarCollapsed: false,
       isLoading: false,
-      loading: { projects: false, notes: false, tasks: false },
-      errors: { projects: null, notes: null, tasks: null },
+      loading: { projects: false, notes: false, tasks: false, files: false },
+      errors: { projects: null, notes: null, tasks: null, files: null },
 
       // --- Auth ---
 
       login: async (email, password) => {
-        if (email === 'demo@example.com' && password === 'demo123') {
-          session.set('demo-token')
-          set({
-            user: {
-              id: 'demo',
-              email: 'demo@example.com',
-              name: 'Demo User',
-              avatar: null,
-              plan: 'free',
-              createdAt: new Date().toISOString(),
-            },
-          })
-          return
-        }
         const res = await authApi.login(email, password)
         session.set(res.access_token)
         const user: User = {
@@ -199,7 +176,7 @@ export const useAppStore = create<AppStore>()(
           email: res.user.email,
           name: res.user.display_name,
           avatar: null,
-          plan: 'free',
+          plan: (res.user.plan as 'free' | 'pro' | 'team') || 'free',
           createdAt: res.user.created_at,
         }
         set({ user })
@@ -213,7 +190,7 @@ export const useAppStore = create<AppStore>()(
           email: res.user.email,
           name: res.user.display_name,
           avatar: null,
-          plan: 'free',
+          plan: (res.user.plan as 'free' | 'pro' | 'team') || 'free',
           createdAt: res.user.created_at,
         }
         set({ user })
@@ -222,6 +199,10 @@ export const useAppStore = create<AppStore>()(
       logout: () => {
         session.clear()
         set({ user: null, notes: [], tasks: [], projects: [], files: [] })
+      },
+
+      updateUser: (updates) => {
+        set((s) => ({ user: s.user ? { ...s.user, ...updates } : null }))
       },
 
       // --- Data loading ---
@@ -234,12 +215,8 @@ export const useAppStore = create<AppStore>()(
         }))
         try {
           const res = await projectsApi.list({ limit: 100 })
-          const existing = get().projects
-          const colorMap = Object.fromEntries(existing.map((p) => [p.id, p.color]))
           set((s) => ({
-            projects: res.items.map((p) =>
-              mapProject(p, colorMap[p.id] ?? PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)])
-            ),
+            projects: res.items.map(mapProject),
             errors: { ...s.errors, projects: null },
           }))
         } catch (err) {
@@ -265,10 +242,8 @@ export const useAppStore = create<AppStore>()(
         }))
         try {
           const res = await notesApi.list({ limit: 100 })
-          const existing = get().notes
-          const pinnedMap = Object.fromEntries(existing.map((n) => [n.id, n.isPinned]))
           set((s) => ({
-            notes: res.items.map((n) => ({ ...mapNote(n), isPinned: pinnedMap[n.id] ?? false })),
+            notes: res.items.map(mapNote),
             errors: { ...s.errors, notes: null },
           }))
         } catch (err) {
@@ -310,6 +285,47 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
+      loadFiles: async () => {
+        set((s) => ({
+          isLoading: true,
+          loading: { ...s.loading, files: true },
+          errors: { ...s.errors, files: null },
+        }))
+        try {
+          const projects = get().projects
+          const allFiles: FileItem[] = []
+          for (const project of projects) {
+            const res = await projectsApi.getFiles(project.id)
+            for (const f of res.items) {
+              allFiles.push({
+                id: f.id,
+                name: f.original_name,
+                type: f.mime_type,
+                size: f.size_bytes,
+                url: filesApi.downloadUrl(f.id),
+                projectId: project.id,
+                tags: [],
+                createdAt: f.created_at,
+                updatedAt: f.updated_at,
+              })
+            }
+          }
+          set((s) => ({ files: allFiles, errors: { ...s.errors, files: null } }))
+        } catch (err) {
+          set((s) => ({
+            errors: {
+              ...s.errors,
+              files: err instanceof Error ? err.message : 'Не удалось загрузить файлы',
+            },
+          }))
+        } finally {
+          set((s) => {
+            const loading = { ...s.loading, files: false }
+            return { loading, isLoading: Object.values(loading).some(Boolean) }
+          })
+        }
+      },
+
       // --- Overlay ---
       toggleOverlay: () => set((s) => ({ isOverlayOpen: !s.isOverlayOpen })),
       setOverlayOpen: (open) => set({ isOverlayOpen: open }),
@@ -322,21 +338,15 @@ export const useAppStore = create<AppStore>()(
 
       createNote: async (noteData) => {
         const projectId = noteData.projectId
-        if (projectId) {
-          try {
-            const created = await notesApi.create({
-              project_id: projectId,
-              title: noteData.title,
-              content: noteData.content,
-              status: 'draft',
-            })
-            const note = { ...mapNote(created), isPinned: noteData.isPinned }
-            set((s) => ({ notes: [note, ...s.notes] }))
-            return note
-          } catch {}
-        }
-        // Fallback: local-only note (no project or API down)
-        const note: Note = { ...noteData, id: generateId(), createdAt: now(), updatedAt: now() }
+        if (!projectId) throw new Error('Заметка должна принадлежать проекту')
+        const created = await notesApi.create({
+          project_id: projectId,
+          title: noteData.title,
+          content: noteData.content,
+          status: 'draft',
+          is_pinned: noteData.isPinned ?? false,
+        })
+        const note = mapNote(created)
         set((s) => ({ notes: [note, ...s.notes] }))
         return note
       },
@@ -346,10 +356,11 @@ export const useAppStore = create<AppStore>()(
           notes: s.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now() } : n)),
         }))
         try {
-          await notesApi.update(id, {
-            title: updates.title,
-            content: updates.content,
-          })
+          const body: Record<string, unknown> = {}
+          if (updates.title !== undefined) body.title = updates.title
+          if (updates.content !== undefined) body.content = updates.content
+          if (updates.isPinned !== undefined) body.is_pinned = updates.isPinned
+          await notesApi.update(id, body)
         } catch {}
       },
 
@@ -367,22 +378,16 @@ export const useAppStore = create<AppStore>()(
 
       createTask: async (taskData) => {
         const projectId = taskData.projectId
-        if (projectId) {
-          try {
-            const created = await tasksApi.create({
-              project_id: projectId,
-              title: taskData.title,
-              description: taskData.description,
-              status: frontendStatusToBackend[taskData.status] ?? 'todo',
-              priority: frontendPriorityToBackend[taskData.priority] ?? 'medium',
-              due_at: taskData.dueDate,
-            })
-            const task = mapTask(created)
-            set((s) => ({ tasks: [task, ...s.tasks] }))
-            return task
-          } catch {}
-        }
-        const task: Task = { ...taskData, id: generateId(), createdAt: now(), updatedAt: now() }
+        if (!projectId) throw new Error('Задача должна принадлежать проекту')
+        const created = await tasksApi.create({
+          project_id: projectId,
+          title: taskData.title,
+          description: taskData.description,
+          status: frontendStatusToBackend[taskData.status] ?? 'todo',
+          priority: frontendPriorityToBackend[taskData.priority] ?? 'medium',
+          due_at: taskData.dueDate,
+        })
+        const task = mapTask(created)
         set((s) => ({ tasks: [task, ...s.tasks] }))
         return task
       },
@@ -416,21 +421,16 @@ export const useAppStore = create<AppStore>()(
       // --- Projects ---
 
       createProject: async (projectData) => {
-        try {
-          const created = await projectsApi.create({
-            kind: 'project',
-            title: projectData.name,
-            description: projectData.description,
-            status: 'active',
-          })
-          const project = mapProject(created, projectData.color)
-          set((s) => ({ projects: [project, ...s.projects] }))
-          return project
-        } catch {
-          const project: Project = { ...projectData, id: generateId(), createdAt: now(), updatedAt: now() }
-          set((s) => ({ projects: [project, ...s.projects] }))
-          return project
-        }
+        const created = await projectsApi.create({
+          kind: 'project',
+          title: projectData.name,
+          description: projectData.description,
+          color: projectData.color,
+          status: 'active',
+        })
+        const project = mapProject(created)
+        set((s) => ({ projects: [project, ...s.projects] }))
+        return project
       },
 
       updateProject: async (id, updates) => {
@@ -438,11 +438,12 @@ export const useAppStore = create<AppStore>()(
           projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates, updatedAt: now() } : p)),
         }))
         try {
-          if (updates.name || updates.description) {
-            await projectsApi.update(id, {
-              title: updates.name,
-              description: updates.description,
-            })
+          const body: Record<string, unknown> = {}
+          if (updates.name !== undefined) body.title = updates.name
+          if (updates.description !== undefined) body.description = updates.description
+          if (updates.color !== undefined) body.color = updates.color
+          if (Object.keys(body).length > 0) {
+            await projectsApi.update(id, body)
           }
         } catch {}
       },
@@ -461,66 +462,39 @@ export const useAppStore = create<AppStore>()(
 
       getProjectById: (id) => get().projects.find((p) => p.id === id),
 
-      // --- Files (local only; use filesApi for actual upload) ---
+      // --- Files ---
 
-      createFile: (fileData) => {
-        const file: FileItem = { ...fileData, id: fileData.id ?? generateId(), createdAt: now(), updatedAt: now() }
-        set((s) => ({ files: [file, ...s.files] }))
-        return file
+      createFile: async (file, projectId) => {
+        const uploaded = await filesApi.upload(file, projectId)
+        const fileItem: FileItem = {
+          id: uploaded.id,
+          name: uploaded.original_name,
+          type: uploaded.mime_type,
+          size: uploaded.size_bytes,
+          url: filesApi.downloadUrl(uploaded.id),
+          projectId,
+          tags: [],
+          createdAt: uploaded.created_at,
+          updatedAt: uploaded.updated_at,
+        }
+        set((s) => ({ files: [fileItem, ...s.files] }))
+        return fileItem
       },
 
-      updateFile: (id, updates) => {
-        set((s) => ({
-          files: s.files.map((f) => (f.id === id ? { ...f, ...updates, updatedAt: now() } : f)),
-        }))
-      },
-
-      deleteFile: (id) => {
+      deleteFile: async (id) => {
         set((s) => ({ files: s.files.filter((f) => f.id !== id) }))
+        try {
+          await filesApi.delete(id)
+        } catch {}
       },
 
       getFileById: (id) => get().files.find((f) => f.id === id),
       getFilesByProject: (projectId) => get().files.filter((f) => f.projectId === projectId),
-
-      // --- Search (local) ---
-
-      search: (query) => {
-        const q = query.toLowerCase()
-        const s = get()
-        return {
-          notes: s.notes.filter(
-            (n) =>
-              n.title.toLowerCase().includes(q) ||
-              n.content.toLowerCase().includes(q) ||
-              n.tags.some((t) => t.toLowerCase().includes(q))
-          ),
-          tasks: s.tasks.filter(
-            (t) =>
-              t.title.toLowerCase().includes(q) ||
-              t.description.toLowerCase().includes(q) ||
-              t.tags.some((tag) => tag.toLowerCase().includes(q))
-          ),
-          projects: s.projects.filter(
-            (p) =>
-              p.name.toLowerCase().includes(q) ||
-              p.description.toLowerCase().includes(q)
-          ),
-          files: s.files.filter(
-            (f) =>
-              f.name.toLowerCase().includes(q) ||
-              f.tags.some((t) => t.toLowerCase().includes(q))
-          ),
-        }
-      },
     }),
     {
       name: 'app-storage',
       partialize: (s) => ({
         user: s.user,
-        notes: s.notes,
-        tasks: s.tasks,
-        projects: s.projects,
-        files: s.files,
         sidebarCollapsed: s.sidebarCollapsed,
       }),
     }

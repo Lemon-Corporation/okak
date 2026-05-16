@@ -34,7 +34,7 @@ export function Overlay() {
   const router = useRouter()
   const isOverlayOpen = useAppStore((state) => state.isOverlayOpen)
   const setOverlayOpen = useAppStore((state) => state.setOverlayOpen)
-  const localSearch = useAppStore((state) => state.search)
+  const projects = useAppStore((state) => state.projects)
   const createNote = useAppStore((state) => state.createNote)
   const createTask = useAppStore((state) => state.createTask)
 
@@ -46,10 +46,6 @@ export function Overlay() {
   const [searchError, setSearchError] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Local search fallback
-  const localResults = query.length >= 2 ? localSearch(query) : null
-
-  // Merge: prefer API results when available
   const searchResults = apiResults
     ? {
         notes: apiResults.notes.map((n) => ({
@@ -58,7 +54,7 @@ export function Overlay() {
           content: '',
           projectId: n.project_id,
           tags: [] as string[],
-          isPinned: false,
+          isPinned: n.is_pinned,
           createdAt: n.updated_at,
           updatedAt: n.updated_at,
         })),
@@ -68,7 +64,7 @@ export function Overlay() {
           description: '',
           projectId: t.project_id,
           status: t.status === 'in_progress' ? 'in-progress' as const : t.status === 'done' ? 'done' as const : 'todo' as const,
-          priority: 'medium' as const,
+          priority: (t.priority === 'high' || t.priority === 'urgent' ? 'high' : t.priority === 'low' || t.priority === 'none' ? 'low' : 'medium') as 'low' | 'medium' | 'high',
           dueDate: null,
           tags: [] as string[],
           createdAt: t.updated_at,
@@ -78,14 +74,14 @@ export function Overlay() {
           id: p.id,
           name: p.title,
           description: '',
-          color: '#3b82f6',
+          color: p.color,
           icon: 'folder',
           createdAt: p.updated_at,
           updatedAt: p.updated_at,
         })),
-        files: [] as typeof localResults extends null ? never[] : NonNullable<typeof localResults>['files'],
+        files: [] as { id: string; name: string; projectId: string | null }[],
       }
-    : localResults
+    : null
 
   const hasResults = searchResults && (
     searchResults.notes.length > 0 ||
@@ -170,10 +166,15 @@ export function Overlay() {
 
   const handleCreateNote = async () => {
     if (!newTitle.trim()) return
+    const firstProjectId = projects[0]?.id ?? null
+    if (!firstProjectId) {
+      setSearchError('Сначала создайте проект')
+      return
+    }
     const note = await createNote({
       title: newTitle.trim(),
       content: '',
-      projectId: null,
+      projectId: firstProjectId,
       tags: [],
       isPinned: false,
     })
@@ -183,10 +184,15 @@ export function Overlay() {
 
   const handleCreateTask = async () => {
     if (!newTitle.trim()) return
+    const firstProjectId = projects[0]?.id ?? null
+    if (!firstProjectId) {
+      setSearchError('Сначала создайте проект')
+      return
+    }
     await createTask({
       title: newTitle.trim(),
       description: '',
-      projectId: null,
+      projectId: firstProjectId,
       status: 'todo',
       priority: 'medium',
       dueDate: null,
@@ -285,7 +291,7 @@ export function Overlay() {
               {!isSearching && searchError && (
                 <div role="alert" className="flex items-center gap-2 p-4 text-sm text-destructive">
                   <AlertCircle className="h-4 w-4" />
-                  {searchError}. Показаны локальные результаты, если они есть.
+                  {searchError}
                 </div>
               )}
 
@@ -358,22 +364,7 @@ export function Overlay() {
                     </div>
                   )}
 
-                  {localResults && localResults.files.length > 0 && (
-                    <div>
-                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Файлы</p>
-                      {localResults.files.slice(0, 3).map((file) => (
-                        <button
-                          key={file.id}
-                          onClick={() => { router.push('/files'); handleClose() }}
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent transition-colors"
-                        >
-                          <Files className="h-4 w-4 text-muted-foreground" />
-                          <span className="truncate text-sm text-foreground">{file.name}</span>
-                          <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* Files search not supported by backend search API yet */}
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, files, notes, projects, search, tags, tasks
+from app.api.v1 import ai, auth, files, notes, projects, search, tags, tasks
 
 router = APIRouter()
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -10,3 +10,4 @@ router.include_router(projects.router, prefix="/projects", tags=["projects"])
 router.include_router(files.router, prefix="/files", tags=["files"])
 router.include_router(tags.router, prefix="/tags", tags=["tags"])
 router.include_router(search.router, prefix="/search", tags=["search"])
+router.include_router(ai.router, prefix="/ai", tags=["ai"])

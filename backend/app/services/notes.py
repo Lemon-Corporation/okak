@@ -56,6 +56,7 @@ class NoteService:
             title=command.title,
             content=command.content,
             status=command.status,
+            is_pinned=command.is_pinned,
         )
         return self._build_note_response(note, [])
 
@@ -87,6 +88,8 @@ class NoteService:
                 if command.status == NoteStatus.ARCHIVED
                 else None
             )
+        if command.is_pinned is not None:
+            note.is_pinned = command.is_pinned
 
         note = await self.note_repository.update(note)
         return await self.get_note(note_id=note.id, owner_user_id=command.owner_user_id)
@@ -180,6 +183,7 @@ class NoteService:
             created_at=note.created_at,
             updated_at=note.updated_at,
             archived_at=note.archived_at,
+            is_pinned=note.is_pinned,
             tags=[TagResponse.model_validate(tag) for tag in tags],
         )
 

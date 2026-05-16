@@ -17,6 +17,7 @@ export default function AppLayout({
   const loadProjects = useAppStore((state) => state.loadProjects)
   const loadNotes = useAppStore((state) => state.loadNotes)
   const loadTasks = useAppStore((state) => state.loadTasks)
+  const loadFiles = useAppStore((state) => state.loadFiles)
 
   useEffect(() => {
     if (!user) {
@@ -24,10 +25,12 @@ export default function AppLayout({
       return
     }
     // Load fresh data from backend on app mount
-    loadProjects()
-    loadNotes()
-    loadTasks()
-  }, [user, router, loadProjects, loadNotes, loadTasks])
+    // Projects must load first since loadFiles iterates over projects
+    void (async () => {
+      await loadProjects()
+      await Promise.all([loadNotes(), loadTasks(), loadFiles()])
+    })()
+  }, [user, router, loadProjects, loadNotes, loadTasks, loadFiles])
 
   if (!user) {
     return (

@@ -27,6 +27,7 @@ class AuthUserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
     display_name: str
+    plan: str
     created_at: datetime
 
 
@@ -65,6 +66,7 @@ class UserRecord:
     email: str
     display_name: str
     hashed_password: str
+    plan: str
     created_at: datetime
     updated_at: datetime
 

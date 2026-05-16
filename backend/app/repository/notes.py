@@ -44,6 +44,7 @@ class NoteRepository:
         title: str,
         content: str,
         status: NoteStatus,
+        is_pinned: bool = False,
     ) -> Note:
         archived_at = datetime.now(timezone.utc) if status == NoteStatus.ARCHIVED else None
         note = Note(
@@ -51,6 +52,7 @@ class NoteRepository:
             title=title,
             content=content,
             status=status,
+            is_pinned=is_pinned,
             archived_at=archived_at,
         )
         self.session.add(note)

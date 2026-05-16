@@ -16,6 +16,7 @@ class ProjectResponse(BaseModel):
     kind: ProjectKind
     title: str
     description: str
+    color: str
     status: ProjectStatus
     created_at: datetime
     updated_at: datetime
@@ -33,6 +34,7 @@ class ProjectCreateRequest(BaseModel):
     kind: ProjectKind = ProjectKind.PROJECT
     title: str = Field(min_length=1, max_length=255)
     description: str = ""
+    color: str = "#3b82f6"
     parent_project_id: uuid.UUID | None = None
     status: ProjectStatus = ProjectStatus.ACTIVE
 
@@ -40,6 +42,7 @@ class ProjectCreateRequest(BaseModel):
 class ProjectUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
+    color: str | None = None
     status: ProjectStatus | None = None
     kind: ProjectKind | None = None
     parent_project_id: uuid.UUID | None = None
@@ -51,6 +54,7 @@ class CreateProjectCommand:
     kind: ProjectKind
     title: str
     description: str
+    color: str
     parent_project_id: uuid.UUID | None
     status: ProjectStatus
 
@@ -60,6 +64,7 @@ class UpdateProjectCommand:
     owner_user_id: uuid.UUID
     title: str | None = None
     description: str | None = None
+    color: str | None = None
     status: ProjectStatus | None = None
     kind: ProjectKind | None = None
     parent_project_id: uuid.UUID | None = None

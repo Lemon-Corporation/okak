@@ -52,19 +52,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleDemoLogin = async () => {
-    setError('')
-    setIsLoading(true)
-    try {
-      await login('demo@example.com', 'demo123')
-      router.push('/space')
-    } catch {
-      setError('Не удалось войти в демо-аккаунт')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
@@ -128,23 +115,6 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
-
-        <div className="mt-4">
-          <div className="relative flex items-center gap-2 py-2">
-            <div className="flex-1 border-t border-border" />
-            <span className="text-xs text-muted-foreground">или</span>
-            <div className="flex-1 border-t border-border" />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleDemoLogin}
-            disabled={isLoading}
-          >
-            Войти как демо
-          </Button>
-        </div>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">

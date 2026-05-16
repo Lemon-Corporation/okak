@@ -13,7 +13,7 @@ export const filesApi = {
     api.get<BackendFile>(`/files/${id}`),
 
   downloadUrl: (id: string): string => {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+    const base = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'
     return `${base}/files/${id}/download`
   },
 

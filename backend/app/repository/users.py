@@ -14,6 +14,7 @@ def _to_user_record(user: User) -> UserRecord:
         email=user.email,
         display_name=user.display_name,
         hashed_password=user.hashed_password,
+        plan=user.plan,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
@@ -36,11 +37,12 @@ class UserRepository:
             return None
         return _to_user_record(user)
 
-    async def create(self, *, email: str, display_name: str, hashed_password: str) -> UserRecord:
+    async def create(self, *, email: str, display_name: str, hashed_password: str, plan: str = "free") -> UserRecord:
         user = User(
             email=email,
             display_name=display_name,
             hashed_password=hashed_password,
+            plan=plan,
         )
         self.session.add(user)
         await self.session.commit()

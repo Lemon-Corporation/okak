@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,4 +31,5 @@ class Note(WithUUID, WithTimestamps, Base):
         default=NoteStatus.DRAFT,
         server_default=NoteStatus.DRAFT.value,
     )
+    is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

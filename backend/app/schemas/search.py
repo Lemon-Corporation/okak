@@ -12,6 +12,7 @@ class SearchNoteResult(BaseModel):
     title: str
     content_excerpt: str
     status: NoteStatus
+    is_pinned: bool
     updated_at: datetime
 
 
@@ -29,6 +30,7 @@ class SearchProjectResult(BaseModel):
     kind: ProjectKind
     title: str
     status: ProjectStatus
+    color: str
     updated_at: datetime
 
 

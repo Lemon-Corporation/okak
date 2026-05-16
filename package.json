@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "cd frontend && pnpm dev",
     "dev:desktop": "cd desktop && pnpm dev",
+    "dev:web": "concurrently \"pnpm:backend\" \"pnpm:frontend\"",
     "dev:full": "concurrently \"pnpm:backend\" \"pnpm:frontend\" \"wait-on http://localhost:3000 && cd desktop && pnpm electron-dev\"",
-    "backend": "cd backend && source .venv/bin/activate && uvicorn main:app --reload",
+    "backend": "cd backend && uv run --with-requirements requirements.txt uvicorn main:app --reload --port 8001",
     "frontend": "cd frontend && pnpm dev",
     "build": "cd frontend && pnpm build",
     "build:desktop": "cd desktop && pnpm build:app",

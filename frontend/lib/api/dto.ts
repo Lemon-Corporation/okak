@@ -4,6 +4,7 @@ export interface BackendUser {
   id: string
   email: string
   display_name: string
+  plan: string
   created_at: string
   updated_at?: string
 }
@@ -21,6 +22,7 @@ export interface BackendProject {
   kind: string
   title: string
   description: string
+  color: string
   status: string
   created_at: string
   updated_at: string
@@ -50,6 +52,7 @@ export interface BackendNote {
   created_at: string
   updated_at: string
   archived_at: string | null
+  is_pinned: boolean
   tags: BackendTag[]
   files?: BackendFileRef[]
 }
@@ -96,6 +99,7 @@ export interface SearchNote {
   title: string
   content_excerpt: string
   status: string
+  is_pinned: boolean
   updated_at: string
 }
 
@@ -113,6 +117,7 @@ export interface SearchProject {
   kind: string
   title: string
   status: string
+  color: string
   updated_at: string
 }
 

@@ -45,6 +45,7 @@ class ProjectRepository:
         kind: ProjectKind,
         title: str,
         description: str,
+        color: str,
         parent_project_id: uuid.UUID | None,
         status: ProjectStatus,
     ) -> Project:
@@ -54,6 +55,7 @@ class ProjectRepository:
             kind=kind,
             title=title,
             description=description,
+            color=color,
             parent_project_id=parent_project_id,
             status=status,
             archived_at=archived_at,

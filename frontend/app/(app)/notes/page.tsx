@@ -56,10 +56,15 @@ export default function NotesPage() {
   }
 
   const handleCreateNote = async () => {
+    const firstProjectId = projects[0]?.id ?? null
+    if (!firstProjectId) {
+      alert('Сначала создайте проект')
+      return
+    }
     const note = await createNote({
       title: 'Новая заметка',
       content: '',
-      projectId: null,
+      projectId: firstProjectId,
       tags: [],
       isPinned: false,
     })

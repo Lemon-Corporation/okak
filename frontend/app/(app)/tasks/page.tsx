@@ -79,10 +79,11 @@ export default function TasksPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [actionError, setActionError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const firstProjectId = projects[0]?.id ?? null
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    projectId: null as string | null,
+    projectId: firstProjectId,
     priority: 'medium' as TaskPriority,
     dueDate: '',
   })
@@ -127,7 +128,7 @@ export default function TasksPage() {
       setNewTask({
         title: '',
         description: '',
-        projectId: null,
+        projectId: firstProjectId,
         priority: 'medium',
         dueDate: '',
       })
@@ -391,16 +392,15 @@ export default function TasksPage() {
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium">Проект</label>
                 <Select
-                  value={newTask.projectId || 'none'}
+                  value={newTask.projectId || ''}
                   onValueChange={(value) =>
-                    setNewTask({ ...newTask, projectId: value === 'none' ? null : value })
+                    setNewTask({ ...newTask, projectId: value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Выберите проект" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Без проекта</SelectItem>
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         <div className="flex items-center gap-2">
@@ -465,7 +465,7 @@ export default function TasksPage() {
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isSaving}>
               Отмена
             </Button>
-            <Button onClick={handleCreateTask} disabled={!newTask.title.trim() || isSaving}>
+            <Button onClick={handleCreateTask} disabled={!newTask.title.trim() || !newTask.projectId || isSaving}>
               {isSaving ? 'Создание...' : 'Создать'}
             </Button>
           </DialogFooter>

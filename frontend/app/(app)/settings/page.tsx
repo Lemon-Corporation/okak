@@ -1,16 +1,26 @@
 'use client'
 
+import { useState } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useAppStore } from '@/lib/store'
+import { authApi } from '@/lib/api'
 import { User, CreditCard, Bell, Shield, Trash2 } from 'lucide-react'
 
 export default function SettingsPage() {
   const user = useAppStore((state) => state.user)
   const logout = useAppStore((state) => state.logout)
+  const updateUser = useAppStore((state) => state.updateUser)
+  const [name, setName] = useState(user?.name || '')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
 
   const planLabels = {
     free: 'Бесплатный',
@@ -39,7 +49,7 @@ export default function SettingsPage() {
               <CardContent className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Имя</label>
-                  <Input defaultValue={user?.name || ''} placeholder="Ваше имя" />
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ваше имя" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Email</label>
@@ -48,8 +58,27 @@ export default function SettingsPage() {
                     Email нельзя изменить
                   </p>
                 </div>
+                {profileError && (
+                  <p className="text-sm text-destructive">{profileError}</p>
+                )}
                 <div className="flex justify-end">
-                  <Button>Сохранить</Button>
+                  <Button
+                    disabled={savingProfile || name === user?.name}
+                    onClick={async () => {
+                      setSavingProfile(true)
+                      setProfileError('')
+                      try {
+                        await authApi.updateMe({ display_name: name })
+                        updateUser({ name })
+                      } catch {
+                        setProfileError('Не удалось сохранить профиль')
+                      } finally {
+                        setSavingProfile(false)
+                      }
+                    }}
+                  >
+                    {savingProfile ? 'Сохранение...' : 'Сохранить'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -132,14 +161,34 @@ export default function SettingsPage() {
               <CardContent className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Текущий пароль</label>
-                  <Input type="password" placeholder="********" />
+                  <Input type="password" placeholder="********" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Новый пароль</label>
-                  <Input type="password" placeholder="Минимум 6 символов" />
+                  <Input type="password" placeholder="Минимум 6 символов" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                 </div>
+                {passwordError && (
+                  <p className="text-sm text-destructive">{passwordError}</p>
+                )}
                 <div className="flex justify-end">
-                  <Button>Изменить пароль</Button>
+                  <Button
+                    disabled={!currentPassword || !newPassword || savingPassword}
+                    onClick={async () => {
+                      setSavingPassword(true)
+                      setPasswordError('')
+                      try {
+                        await authApi.updateMe({ password: newPassword })
+                        setCurrentPassword('')
+                        setNewPassword('')
+                      } catch {
+                        setPasswordError('Не удалось изменить пароль')
+                      } finally {
+                        setSavingPassword(false)
+                      }
+                    }}
+                  >
+                    {savingPassword ? 'Сохранение...' : 'Изменить пароль'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

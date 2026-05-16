@@ -44,6 +44,7 @@ class ProjectService:
             kind=command.kind,
             title=command.title,
             description=command.description,
+            color=command.color,
             parent_project_id=command.parent_project_id,
             status=command.status,
         )
@@ -78,6 +79,8 @@ class ProjectService:
             project.title = command.title
         if command.description is not None:
             project.description = command.description
+        if command.color is not None:
+            project.color = command.color
         if command.kind is not None:
             project.kind = command.kind
         if command.status is not None:

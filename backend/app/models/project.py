@@ -37,6 +37,7 @@ class Project(WithUUID, WithTimestamps, Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    color: Mapped[str] = mapped_column(String(7), nullable=False, default="#3b82f6", server_default="#3b82f6")
     status: Mapped[ProjectStatus] = mapped_column(
         Enum(ProjectStatus, name="project_status", values_callable=enum_values),
         nullable=False,

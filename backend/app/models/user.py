@@ -11,3 +11,4 @@ class User(WithUUID, WithTimestamps, Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    plan: Mapped[str] = mapped_column(String(20), nullable=False, default="free")

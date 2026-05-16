@@ -66,6 +66,7 @@ class SearchRepository:
                         'MaxWords=15,MinWords=5'
                     ) AS content_excerpt,
                     notes.status,
+                    notes.is_pinned,
                     notes.updated_at,
                     ts_rank(
                         to_tsvector(
@@ -147,6 +148,7 @@ class SearchRepository:
                     projects.kind,
                     projects.title,
                     projects.status,
+                    projects.color,
                     projects.updated_at,
                     ts_rank(
                         to_tsvector(

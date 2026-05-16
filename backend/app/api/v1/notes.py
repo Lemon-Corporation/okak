@@ -62,6 +62,7 @@ async def create_note(
             title=body.title,
             content=body.content,
             status=body.status,
+            is_pinned=getattr(body, 'is_pinned', False),
         )
     )
 
@@ -92,6 +93,7 @@ async def update_note(
             title=body.title,
             content=body.content,
             status=body.status,
+            is_pinned=body.is_pinned,
         ),
     )
 

@@ -20,8 +20,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAppStore } from '@/lib/store'
-import { filesApi } from '@/lib/api'
-import type { BackendFile } from '@/lib/api/dto'
 import { formatFileSize, formatRelativeDate, getFileIcon, cn } from '@/lib/utils'
 import {
   Search,
@@ -42,18 +40,6 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-
-function mapUploadedFile(file: BackendFile, projectId: string) {
-  return {
-    id: file.id,
-    name: file.original_name,
-    type: file.mime_type,
-    size: file.size_bytes,
-    url: filesApi.downloadUrl(file.id),
-    projectId,
-    tags: [],
-  }
-}
 
 const iconMap: Record<string, React.ElementType> = {
   'image': Image,
@@ -109,24 +95,16 @@ export default function FilesPage() {
 
   const addFiles = useCallback(async (selectedFiles: globalThis.File[]) => {
     if (selectedFiles.length === 0) return
+    if (filterProject === 'all') {
+      setActionError('Выберите проект перед загрузкой файлов')
+      return
+    }
 
     setActionError('')
     setIsUploading(true)
     try {
       for (const file of selectedFiles) {
-        if (filterProject !== 'all') {
-          const uploaded = await filesApi.upload(file, filterProject)
-          createFile(mapUploadedFile(uploaded, filterProject))
-        } else {
-          createFile({
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            url: URL.createObjectURL(file),
-            projectId: null,
-            tags: [],
-          })
-        }
+        await createFile(file, filterProject)
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось загрузить файл')
@@ -149,11 +127,10 @@ export default function FilesPage() {
   const handleDelete = async (fileId: string) => {
     setActionError('')
     try {
-      await filesApi.delete(fileId)
-    } catch {
-      // Файл мог быть добавлен локально без backend id — тогда удаляем только из local store.
+      await deleteFile(fileId)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось удалить файл')
     }
-    deleteFile(fileId)
   }
 
   const handleDownload = (url: string) => {

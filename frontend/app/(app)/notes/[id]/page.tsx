@@ -7,13 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -21,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAppStore } from '@/lib/store'
+import { tagsApi, notesApi } from '@/lib/api'
+import type { BackendTag } from '@/lib/api/tags'
 import { formatDate } from '@/lib/utils'
 import {
   ArrowLeft,
@@ -46,49 +41,38 @@ export default function NoteDetailPage() {
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [projectId, setProjectId] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
+  const [allTags, setAllTags] = useState<BackendTag[]>([])
 
   useEffect(() => {
     if (note) {
       setTitle(note.title)
       setContent(note.content)
-      setProjectId(note.projectId)
       setTags(note.tags)
     }
   }, [note])
 
-  // Auto-save debounced
+  // Load all tags on mount
+  useEffect(() => {
+    tagsApi.list().then((res) => setAllTags(res.items)).catch(() => {})
+  }, [noteId])
+
+  // Auto-save debounced (title/content only — tags sync via separate APIs)
   useEffect(() => {
     if (!note) return
 
     const timeout = setTimeout(() => {
       if (
         title !== note.title ||
-        content !== note.content ||
-        projectId !== note.projectId ||
-        JSON.stringify(tags) !== JSON.stringify(note.tags)
+        content !== note.content
       ) {
-        updateNote(noteId, { title, content, projectId, tags })
+        updateNote(noteId, { title, content })
       }
     }, 500)
 
     return () => clearTimeout(timeout)
-  }, [title, content, projectId, tags, noteId, note, updateNote])
-  const uniqueProjectsMap = new Map()
-
-  projects.forEach((project) => {
-    if (!uniqueProjectsMap.has(project.name)) {
-      uniqueProjectsMap.set(project.name, project)
-    }
-
-    if (project.id === projectId) {
-      uniqueProjectsMap.set(project.name, project)
-    }
-  })
-
-  const uniqueProjects = Array.from(uniqueProjectsMap.values())
+  }, [title, content, noteId, note, updateNote])
 
   if (!note) {
     return (
@@ -114,15 +98,36 @@ export default function NoteDetailPage() {
     router.push('/notes')
   }
 
-  const handleAddTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()])
-      setNewTag('')
+  const handleAddTag = async () => {
+    const name = newTag.trim()
+    if (!name || tags.includes(name)) return
+
+    let tag = allTags.find((t) => t.name === name)
+    if (!tag) {
+      try {
+        const created = await tagsApi.create({ name, color: '#3b82f6' })
+        tag = created
+        setAllTags((prev) => [...prev, created])
+      } catch {
+        return
+      }
     }
+    if (!tag) return
+
+    try {
+      await notesApi.addTag(noteId, tag.id)
+      setTags((prev) => [...prev, name])
+      setNewTag('')
+    } catch {}
   }
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter((t) => t !== tagToRemove))
+  const handleRemoveTag = async (tagToRemove: string) => {
+    const tag = allTags.find((t) => t.name === tagToRemove)
+    if (!tag) return
+    try {
+      await notesApi.removeTag(noteId, tag.id)
+      setTags((prev) => prev.filter((t) => t !== tagToRemove))
+    } catch {}
   }
 
   return (
@@ -184,28 +189,9 @@ export default function NoteDetailPage() {
           <div className="mb-6 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Проект:</span>
-              <Select
-                value={projectId || 'none'}
-                onValueChange={(value) => setProjectId(value === 'none' ? null : value)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Выберите проект" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Без проекта</SelectItem>
-                  {uniqueProjects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: project.color }}
-                        />
-                        {project.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-sm font-medium">
+                {projects.find((p) => p.id === note.projectId)?.name || 'Без проекта'}
+              </span>
             </div>
           </div>
 

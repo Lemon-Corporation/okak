@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Send, Bot, Sparkles, Loader2 } from 'lucide-react'
 import { desktopHideOverlay } from '@/lib/electron'
+import { aiApi } from '@/lib/api'
 
 export default function OverlayPage() {
   const [input, setInput] = useState('')
@@ -19,17 +20,18 @@ export default function OverlayPage() {
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setIsLoading(true)
 
-    // TODO: integrate with real AI API
-    setTimeout(() => {
+    try {
+      const history = messages.map((m) => ({ role: m.role, content: m.content }))
+      const res = await aiApi.chat([...history, { role: 'user', content: userMessage }])
+      setMessages((prev) => [...prev, { role: 'assistant', content: res.content }])
+    } catch {
       setMessages((prev) => [
         ...prev,
-        {
-          role: 'assistant',
-          content: 'Это демо-ответ. Здесь будет интеграция с AI для помощи в задачах и заметках.',
-        },
+        { role: 'assistant', content: 'Не удалось получить ответ от AI. Попробуйте позже.' },
       ])
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
