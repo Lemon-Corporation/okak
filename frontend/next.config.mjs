@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:8000'
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -12,7 +14,7 @@ const nextConfig = {
       beforeFiles: [
         {
           source: '/api/v1/:path*',
-          destination: 'http://localhost:8000/api/v1/:path*',
+          destination: `${apiInternalUrl}/api/v1/:path*`,
         },
       ],
     }
