@@ -10,6 +10,11 @@ from app.schemas.auth import UserRecord
 from app.schemas.enums import NoteStatus, ProjectKind, ProjectStatus, TaskPriority, TaskStatus
 from app.schemas.files import FileAttachRequest, PaginatedFilesResponse, ProjectFileLinkResponse
 from app.schemas.notes import NoteFilters, PaginatedNotesResponse
+from app.schemas.ai import (
+    ProjectAIContextPreviewResponse,
+    ProjectAIContextRebuildResponse,
+    ProjectAIContextStatusResponse,
+)
 from app.schemas.projects import (
     CreateProjectCommand,
     PaginatedProjectsResponse,
@@ -210,6 +215,42 @@ async def detach_project_file(
         owner_user_id=current_user.id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{project_id}/ai-context/status", response_model=ProjectAIContextStatusResponse)
+async def get_project_ai_context_status(
+    project_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> ProjectAIContextStatusResponse:
+    return await container.ai_context_service.get_status(
+        project_id=project_id,
+        owner_user_id=current_user.id,
+    )
+
+
+@router.post("/{project_id}/ai-context/rebuild", response_model=ProjectAIContextRebuildResponse)
+async def rebuild_project_ai_context(
+    project_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> ProjectAIContextRebuildResponse:
+    return await container.ai_context_service.rebuild_project_context(
+        project_id=project_id,
+        owner_user_id=current_user.id,
+    )
+
+
+@router.get("/{project_id}/ai-context/preview", response_model=ProjectAIContextPreviewResponse)
+async def preview_project_ai_context(
+    project_id: uuid.UUID,
+    container: Annotated[AppContainer, Depends(get_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> ProjectAIContextPreviewResponse:
+    return await container.ai_context_service.get_preview(
+        project_id=project_id,
+        owner_user_id=current_user.id,
+    )
 
 
 def _parse_parent_project_id(value: str | None) -> tuple[uuid.UUID | None, bool]:

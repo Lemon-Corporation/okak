@@ -9,4 +9,5 @@ passlib[bcrypt]
 bcrypt==4.0.1
 python-multipart
 openai>=1.0
+httpx>=0.27
 alembic

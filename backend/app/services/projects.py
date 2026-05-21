@@ -7,6 +7,7 @@ from app.models.project import Project
 from app.repository.files import FileRepository
 from app.repository.projects import ProjectRepository
 from app.repository.tasks import TaskRepository
+from app.services.ai_context import AIContextService
 from app.schemas.enums import ProjectStatus
 from app.schemas.files import FileResponse, PaginatedFilesResponse, ProjectFileLinkResponse
 from app.schemas.projects import (
@@ -25,6 +26,7 @@ class ProjectService:
     project_repository: ProjectRepository
     task_repository: TaskRepository
     file_repository: FileRepository
+    ai_context_service: AIContextService | None = None
 
     async def list_projects(self, filters: ProjectFilters) -> PaginatedProjectsResponse:
         projects, total = await self.project_repository.list(filters)
@@ -47,6 +49,10 @@ class ProjectService:
             color=command.color,
             parent_project_id=command.parent_project_id,
             status=command.status,
+        )
+        await self._refresh_project_context(
+            project_id=project.id,
+            owner_user_id=command.owner_user_id,
         )
         return ProjectResponse.model_validate(project)
 
@@ -92,11 +98,16 @@ class ProjectService:
             )
 
         project = await self.project_repository.update(project)
+        await self._refresh_project_context(
+            project_id=project.id,
+            owner_user_id=command.owner_user_id,
+        )
         return ProjectResponse.model_validate(project)
 
     async def archive_project(self, *, project_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
         await self._ensure_owned(project_id, owner_user_id)
         await self.project_repository.archive_tree(project_id=project_id)
+        await self._refresh_project_context(project_id=project_id, owner_user_id=owner_user_id)
 
     async def list_project_tasks(
         self,
@@ -159,6 +170,7 @@ class ProjectService:
         )
         if link is None:
             raise UserAppError(code="already_exists", message="File already attached to project")
+        await self._refresh_project_context(project_id=project_id, owner_user_id=owner_user_id)
         return ProjectFileLinkResponse.model_validate(link)
 
     async def detach_file(
@@ -170,6 +182,15 @@ class ProjectService:
     ) -> None:
         await self._ensure_owned(project_id, owner_user_id)
         await self.file_repository.detach_project_file(project_id=project_id, file_id=file_id)
+        await self._refresh_project_context(project_id=project_id, owner_user_id=owner_user_id)
+
+    async def _refresh_project_context(self, *, project_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
+        if self.ai_context_service is None:
+            return
+        await self.ai_context_service.rebuild_project_context(
+            project_id=project_id,
+            owner_user_id=owner_user_id,
+        )
 
     async def _ensure_owned(self, project_id: uuid.UUID, owner_user_id: uuid.UUID) -> Project:
         project = await self.project_repository.get(project_id)

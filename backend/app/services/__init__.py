@@ -1,3 +1,5 @@
+from app.services.agents import AIAgentService, ProjectAgentService
+from app.services.ai_context import AIContextService
 from app.services.auth import AuthService
 from app.services.files import FileService
 from app.services.notes import NoteService
@@ -8,8 +10,11 @@ from app.services.tasks import TaskService
 
 __all__ = [
     "AuthService",
+    "AIAgentService",
+    "AIContextService",
     "FileService",
     "NoteService",
+    "ProjectAgentService",
     "ProjectService",
     "SearchService",
     "TagService",
