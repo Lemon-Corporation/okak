@@ -2,6 +2,11 @@
 const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:8000'
 
 const nextConfig = {
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: false,
+    buildActivityPosition: 'bottom-left',
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

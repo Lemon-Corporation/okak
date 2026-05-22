@@ -42,6 +42,10 @@ class ChatResponse(BaseModel):
     sources: list[AISource] = Field(default_factory=list)
 
 
+class TTSRequest(BaseModel):
+    text: str
+
+
 class ProjectAIContextStatusResponse(BaseModel):
     project_id: uuid.UUID
     status: str

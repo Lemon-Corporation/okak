@@ -1,205 +1,249 @@
 'use client'
 
-import { PageHeader } from '@/components/page-header'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
-import { formatRelativeDate } from '@/lib/utils'
-import Link from 'next/link'
 import {
+  ArrowUp,
+  Sparkles,
   StickyNote,
   CheckSquare,
   FolderKanban,
-  Files,
-  Plus,
-  ArrowRight,
-  Clock,
+  Search,
+  Bot,
+  User,
 } from 'lucide-react'
 
-export default function SpacePage() {
+type Role = 'user' | 'assistant'
+
+interface Message {
+  id: string
+  role: Role
+  text: string
+}
+
+const suggestions = [
+  { icon: StickyNote, label: 'Создать заметку', prompt: 'Помоги создать структуру заметки для нового проекта' },
+  { icon: CheckSquare, label: 'Задачи на сегодня', prompt: 'Составь список задач на продуктивный день' },
+  { icon: FolderKanban, label: 'Организовать проект', prompt: 'Как лучше организовать рабочий проект в ОКАК?' },
+  { icon: Search, label: 'Найти по смыслу', prompt: 'Покажи, как искать заметки по ключевым словам' },
+]
+
+const stubReplies: Record<string, string> = {
+  default:
+    'Привет! Я помогаю организовать работу в ОКАК — заметки, задачи, проекты и файлы. Спросите что-нибудь или выберите подсказку выше.',
+}
+
+function getReply(text: string): string {
+  const lower = text.toLowerCase()
+  if (lower.includes('заметк'))
+    return 'Хорошая идея! Зайдите в раздел «Заметки» или нажмите «Быстрое создание» в боковом меню. Можете добавить теги и привязать к проекту.'
+  if (lower.includes('задач'))
+    return 'Для задач откройте раздел «Задачи». Установите приоритет и срок — так ничего не потеряется. Хотите я покажу как создать задачу прямо сейчас?'
+  if (lower.includes('проект'))
+    return 'В разделе «Проекты» вы можете собрать задачи, заметки и файлы под одну крышу. Начните с цвета и описания — это поможет быстро ориентироваться.'
+  if (lower.includes('поиск') || lower.includes('найти'))
+    return 'Поиск работает по всему содержимому: заметкам, задачам и проектам одновременно. Нажмите ⌘K или воспользуйтесь строкой поиска в меню.'
+  return 'Понял вас! Если нужно что-то конкретное — уточните, и я постараюсь помочь с организацией вашей работы в ОКАК.'
+}
+
+export default function ChatPage() {
   const user = useAppStore((state) => state.user)
-  const notes = useAppStore((state) => state.notes)
-  const tasks = useAppStore((state) => state.tasks)
-  const projects = useAppStore((state) => state.projects)
-  const files = useAppStore((state) => state.files)
-  const setOverlayOpen = useAppStore((state) => state.setOverlayOpen)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const recentNotes = [...notes].sort((a, b) => 
-    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  ).slice(0, 3)
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
 
-  const activeTasks = tasks.filter((t) => t.status !== 'done').slice(0, 5)
-  const completedTasksCount = tasks.filter((t) => t.status === 'done').length
+  function autoResize() {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+  }
 
-  const stats = [
-    { label: 'Заметки', value: notes.length, icon: StickyNote, href: '/notes', color: 'bg-blue-500/10 text-blue-600' },
-    { label: 'Задачи', value: tasks.length, icon: CheckSquare, href: '/tasks', color: 'bg-green-500/10 text-green-600' },
-    { label: 'Проекты', value: projects.length, icon: FolderKanban, href: '/projects', color: 'bg-orange-500/10 text-orange-600' },
-    { label: 'Файлы', value: files.length, icon: Files, href: '/files', color: 'bg-purple-500/10 text-purple-600' },
-  ]
+  async function send(text: string) {
+    const trimmed = text.trim()
+    if (!trimmed || loading) return
+
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text: trimmed }
+    setMessages((prev) => [...prev, userMsg])
+    setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    setLoading(true)
+
+    await new Promise((r) => setTimeout(r, 820))
+
+    const reply = getReply(trimmed)
+    const assistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', text: reply }
+    setMessages((prev) => [...prev, assistantMsg])
+    setLoading(false)
+  }
+
+  const isEmpty = messages.length === 0
 
   return (
-    <div className="flex flex-col">
-      <PageHeader 
-        title="Пространство"
-        actions={
-          <Button onClick={() => setOverlayOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Создать
-          </Button>
-        }
-      />
-
-      <main className="flex-1 p-6">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-foreground">
-            Привет, {user?.name || 'Пользователь'}!
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Вот обзор вашего рабочего пространства
-          </p>
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      {/* Top bar */}
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">           
+        <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-white">
+          <Bot className="h-4 w-4" />
         </div>
-
-        {/* Stats Grid */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Link key={stat.label} href={stat.href}>
-              <Card className="transition-colors hover:border-blue-600">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}>
-                    <stat.icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-semibold text-foreground">{stat.value}</p>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+        <span className="font-bold text-foreground">Ассистент ОКАК</span>
+        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-lime/20 px-3 py-1">
+          <span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_10px_oklch(0.85_0.25_130)]" />
+          <span className="text-xs font-bold text-foreground">онлайн</span>
         </div>
+      </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Notes */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Последние заметки</CardTitle>
-                  <CardDescription>Недавно обновленные заметки</CardDescription>
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-2xl">
+          <AnimatePresence>
+            {isEmpty ? (
+              <motion.div
+                key="welcome"
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.5 }}
+                className="flex flex-col items-center pt-16 text-center"
+              >
+                <div className="mb-5 grid h-16 w-16 place-items-center rounded-3xl bg-blue text-white shadow-xl shadow-blue/25">
+                  <Sparkles className="h-8 w-8" />
                 </div>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/notes">
-                    Все заметки
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {recentNotes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <StickyNote className="mb-2 h-8 w-8 text-muted-foreground/50" />
-                  <p className="text-sm text-muted-foreground">Нет заметок</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => setOverlayOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Создать заметку
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {recentNotes.map((note) => (
-                    <Link
-                      key={note.id}
-                      href={`/notes/${note.id}`}
-                      className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-blue/5"
-                    >
-                      <StickyNote className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{note.title}</p>
-                        <p className="text-sm text-muted-foreground line-clamp-1">
-                          {note.content || 'Пустая заметка'}
-                        </p>
-                      </div>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                        <Clock className="h-3 w-3" />
-                        {formatRelativeDate(note.updatedAt)}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                <h2 className="text-2xl font-black tracking-tight text-foreground">
+                  Привет, {user?.name?.split(' ')[0] || 'друг'}!
+                </h2>
+                <p className="mt-2 max-w-sm text-foreground/70">
+                  Я ваш ассистент в ОКАК. Помогу с заметками, задачами и проектами.
+                </p>
 
-          {/* Active Tasks */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Активные задачи</CardTitle>
-                  <CardDescription>
-                    Выполнено {completedTasksCount} из {tasks.length} задач
-                  </CardDescription>
+                <div className="mt-10 grid w-full gap-3 sm:grid-cols-2">
+                  {suggestions.map((s) => {
+                    const Icon = s.icon
+                    return (
+                      <button
+                        key={s.label}
+                        onClick={() => send(s.prompt)}
+                        className="liquid-glass flex items-center gap-3 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue/10"
+                      >
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue/10">
+                          <Icon className="h-4 w-4 text-blue" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{s.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{s.prompt}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/tasks">
-                    Все задачи
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {activeTasks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <CheckSquare className="mb-2 h-8 w-8 text-muted-foreground/50" />
-                  <p className="text-sm text-muted-foreground">Нет активных задач</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => setOverlayOpen(true)}
+              </motion.div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {messages.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                   >
-                    <Plus className="h-4 w-4" />
-                    Создать задачу
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {activeTasks.map((task) => (
+                    {/* Avatar */}
                     <div
-                      key={task.id}
-                      className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-blue/5"
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${
+                        msg.role === 'assistant' ? 'bg-primary text-white' : 'bg-lime text-black'
+                      }`}
                     >
-                      <div className={`h-2 w-2 rounded-full ${
-                        task.priority === 'high' ? 'bg-red-500' :
-                        task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{task.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {task.status === 'in-progress' ? 'В работе' : 'К выполнению'}
-                        </p>
-                      </div>
-                      {task.dueDate && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {formatRelativeDate(task.dueDate)}
-                        </span>
+                      {msg.role === 'assistant' ? (
+                        <Bot className="h-4 w-4" />
+                      ) : (
+                        <User className="h-4 w-4" />
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
+                    {/* Bubble */}
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                        msg.role === 'user'
+                          ? 'bg-primary text-white rounded-tr-sm'
+                          : 'liquid-glass text-foreground rounded-tl-sm'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </motion.div>
+                ))}
+
+                {loading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-3"
+                  >
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-white">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <div className="liquid-glass flex items-center gap-1.5 rounded-2xl rounded-tl-sm px-4 py-3">
+                      {[0, 1, 2].map((i) => (
+                        <motion.span
+                          key={i}
+                          className="h-2 w-2 rounded-full bg-blue"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.2 }}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            )}
+          </AnimatePresence>
+          <div ref={bottomRef} />
         </div>
-      </main>
+      </div>
+
+      {/* Input bar */}
+      <div className="shrink-0 border-t border-border px-4 pb-5 pt-4 sm:px-6">
+        <div className="mx-auto max-w-2xl">
+          <div className="liquid-glass flex items-end gap-3 rounded-2xl p-3">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value)
+                autoResize()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  send(input)
+                }
+              }}
+              placeholder="Спросите что-нибудь…"
+              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              style={{ maxHeight: 160 }}
+            />
+            <Button
+              onClick={() => send(input)}
+              disabled={!input.trim() || loading}
+              className="h-9 w-9 shrink-0 rounded-xl bg-blue p-0 text-white shadow-lg shadow-blue/25 hover:bg-blue-dark disabled:opacity-40"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Enter — отправить · Shift+Enter — новая строка
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

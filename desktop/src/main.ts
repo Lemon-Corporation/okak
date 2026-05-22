@@ -43,7 +43,7 @@ if (isDev) {
 }
 
 let mainWindow: BrowserWindow | null = null
-let overlayWindow: BrowserWindow | null = null
+let widgetWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let serverProcess: ChildProcess | null = null
 
@@ -262,9 +262,6 @@ function createWindow(): void {
       event.preventDefault()
       saveBounds()
       mainWindow?.hide()
-      // Show overlay when main window is hidden
-      if (!overlayWindow) createOverlayWindow()
-      overlayWindow?.show()
     }
   })
 
@@ -307,31 +304,29 @@ function createWindow(): void {
   })
 }
 
-function createOverlayWindow(): void {
-  log.info('[overlay] creating overlay window')
-  const width = 380
-  const height = 500
+function createWidgetWindow(): void {
+  log.info('[widget] creating widget window')
+  const size = 100
   const margin = 20
 
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth } = primaryDisplay.workAreaSize
 
-  overlayWindow = new BrowserWindow({
-    width,
-    height,
-    x: screenWidth - width - margin,
+  widgetWindow = new BrowserWindow({
+    width: size,
+    height: size,
+    x: screenWidth - size - margin,
     y: margin,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
-    resizable: true,
+    resizable: false,
     movable: true,
     minimizable: false,
     maximizable: false,
     transparent: true,
-    hasShadow: true,
-    roundedCorners: true,
+    hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -340,39 +335,34 @@ function createOverlayWindow(): void {
     },
   })
 
-  const overlayUrl = isDev
-    ? 'http://localhost:3000/overlay'
-    : `http://localhost:${process.env.PORT || '3000'}/overlay`
+  const widgetUrl = isDev
+    ? 'http://localhost:3000/widget'
+    : `http://localhost:${process.env.PORT || '3000'}/widget`
 
-  log.info('[overlay] loading URL:', overlayUrl)
-  overlayWindow.loadURL(overlayUrl).catch((err) => {
-    log.error('[overlay] failed to load:', err)
+  widgetWindow.loadURL(widgetUrl).catch((err) => {
+    log.error('[widget] failed to load:', err)
   })
 
-  overlayWindow.on('ready-to-show', () => {
-    log.info('[overlay] ready to show')
+  widgetWindow.once('ready-to-show', () => {
+    widgetWindow?.showInactive()
   })
 
-  overlayWindow.on('closed', () => {
-    log.info('[overlay] closed')
-    overlayWindow = null
+  widgetWindow.on('closed', () => {
+    widgetWindow = null
   })
 }
 
+function createOverlayWindow(): void {
+  // Deprecated: replaced by inline widget
+}
+
 function toggleOverlay(): void {
-  log.info('[overlay] toggleOverlay called, overlayWindow exists:', !!overlayWindow)
-  if (!overlayWindow) {
-    createOverlayWindow()
-  }
-  if (overlayWindow) {
-    if (overlayWindow.isVisible()) {
-      log.info('[overlay] hiding')
-      overlayWindow.hide()
-    } else {
-      log.info('[overlay] showing')
-      overlayWindow.show()
-      overlayWindow.focus()
-    }
+  // Deprecated: replaced by inline widget
+  if (widgetWindow) {
+    widgetWindow.show()
+    widgetWindow.focus()
+    // Send message to widget to expand
+    widgetWindow.webContents.send('app:toggle-widget-expand')
   }
 }
 
@@ -817,15 +807,18 @@ ipcMain.handle('app:clipboard-write', (_event, text: string) => {
   clipboard.writeText(text)
 })
 
-// Overlay
+// Overlay (now redirects to widget)
 ipcMain.handle('app:show-overlay', () => {
-  if (!overlayWindow) createOverlayWindow()
-  overlayWindow?.show()
-  overlayWindow?.focus()
+  if (widgetWindow) {
+    widgetWindow.show()
+    widgetWindow.focus()
+  }
 })
 
 ipcMain.handle('app:hide-overlay', () => {
-  overlayWindow?.hide()
+  if (widgetWindow) {
+    widgetWindow.webContents.send('app:hide-widget')
+  }
 })
 
 ipcMain.handle('app:toggle-overlay', () => {
@@ -833,7 +826,21 @@ ipcMain.handle('app:toggle-overlay', () => {
 })
 
 ipcMain.handle('app:is-overlay-visible', () => {
-  return overlayWindow?.isVisible() || false
+  return widgetWindow?.isVisible() || false
+})
+
+ipcMain.handle('app:resize-widget', (_event, expanded: boolean) => {
+  if (widgetWindow) {
+    const margin = 20
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const { width: screenWidth } = primaryDisplay.workAreaSize
+    
+    if (expanded) {
+      widgetWindow.setBounds({ width: 450, height: 120, x: screenWidth - 450 - margin, y: margin })
+    } else {
+      widgetWindow.setBounds({ width: 100, height: 100, x: screenWidth - 100 - margin, y: margin })
+    }
+  }
 })
 
 // Find in page
@@ -965,6 +972,7 @@ app.on('open-url', (event, url) => {
 app.on('ready', () => {
   log.info('App starting... version:', app.getVersion())
   createWindow()
+  createWidgetWindow()
   createTray()
   Menu.setApplicationMenu(buildMenu())
   startConnectivityCheck()
