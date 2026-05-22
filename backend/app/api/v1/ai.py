@@ -9,7 +9,6 @@ from app.ioc.container import AppContainer
 from app.presentation.dependencies import get_container, get_current_user
 from app.schemas.ai import ChatRequest, ChatResponse, TTSRequest
 from app.schemas.auth import UserRecord
-from app.services.llm import chat
 from app.services.tts import synthesize_speech
 
 router = APIRouter()
@@ -21,25 +20,26 @@ async def chat_endpoint(
     container: Annotated[AppContainer, Depends(get_container)],
     current_user: Annotated[UserRecord, Depends(get_current_user)],
 ) -> ChatResponse:
-    messages = [{"role": m.role, "content": m.content} for m in body.messages]
-    response = await chat(messages)
-    return ChatResponse(role=response.get("role", "assistant"), content=response.get("content", ""))
+    return await container.ai_agent_service.chat(
+        owner_user_id=current_user.id,
+        request=body,
+    )
 
 
 @router.post("/tts", status_code=status.HTTP_200_OK)
 async def tts_endpoint(
     body: TTSRequest,
-    container: Annotated[AppContainer, Depends(get_container)],
+    _current_user: Annotated[UserRecord, Depends(get_current_user)],
 ):
     audio_path = await synthesize_speech(body.text)
-    
+
     # We clean up the temp file after sending it
-    def cleanup():
+    def cleanup() -> None:
         try:
             os.remove(audio_path)
         except Exception:
             pass
-            
+
     return FileResponse(
         path=audio_path,
         media_type="audio/wav",

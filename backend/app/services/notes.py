@@ -11,6 +11,7 @@ from app.repository.files import FileRepository
 from app.repository.notes import NoteRepository
 from app.repository.projects import ProjectRepository
 from app.repository.tags import TagRepository
+from app.services.ai_context import AIContextService
 from app.schemas.enums import NoteStatus
 from app.schemas.files import FileBriefResponse, NoteFileLinkResponse
 from app.schemas.notes import (
@@ -30,6 +31,7 @@ class NoteService:
     project_repository: ProjectRepository
     tag_repository: TagRepository
     file_repository: FileRepository
+    ai_context_service: AIContextService | None = None
 
     async def list_notes(self, filters: NoteFilters) -> PaginatedNotesResponse:
         if filters.project_id is not None:
@@ -57,6 +59,10 @@ class NoteService:
             content=command.content,
             status=command.status,
             is_pinned=command.is_pinned,
+        )
+        await self._refresh_project_context(
+            project_id=note.project_id,
+            owner_user_id=command.owner_user_id,
         )
         return self._build_note_response(note, [])
 
@@ -92,11 +98,17 @@ class NoteService:
             note.is_pinned = command.is_pinned
 
         note = await self.note_repository.update(note)
+        await self._refresh_project_context(
+            project_id=note.project_id,
+            owner_user_id=command.owner_user_id,
+        )
         return await self.get_note(note_id=note.id, owner_user_id=command.owner_user_id)
 
     async def delete_note(self, *, note_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
         note = await self._ensure_note_owned(note_id, owner_user_id)
+        project_id = note.project_id
         await self.note_repository.soft_delete_and_unlink_tasks(note)
+        await self._refresh_project_context(project_id=project_id, owner_user_id=owner_user_id)
 
     async def attach_tag(
         self,
@@ -137,6 +149,8 @@ class NoteService:
         link = await self.note_repository.attach_file(note_id=note_id, file_id=file_id)
         if link is None:
             raise UserAppError(code="already_exists", message="File already attached to this note")
+        note = await self._ensure_note_owned(note_id, owner_user_id)
+        await self._refresh_project_context(project_id=note.project_id, owner_user_id=owner_user_id)
         return NoteFileLinkResponse.model_validate(link)
 
     async def detach_file(
@@ -148,6 +162,16 @@ class NoteService:
     ) -> None:
         await self._ensure_note_owned(note_id, owner_user_id)
         await self.note_repository.detach_file(note_id=note_id, file_id=file_id)
+        note = await self._ensure_note_owned(note_id, owner_user_id)
+        await self._refresh_project_context(project_id=note.project_id, owner_user_id=owner_user_id)
+
+    async def _refresh_project_context(self, *, project_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
+        if self.ai_context_service is None:
+            return
+        await self.ai_context_service.rebuild_project_context(
+            project_id=project_id,
+            owner_user_id=owner_user_id,
+        )
 
     async def _ensure_project_owned(
         self,

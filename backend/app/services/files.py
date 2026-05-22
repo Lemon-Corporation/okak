@@ -9,6 +9,7 @@ from app.models.project import Project
 from app.repository.files import FileRepository, FileStorageRepository
 from app.repository.projects import ProjectRepository
 from app.schemas.files import FileDownload, FileResponse, UploadFileCommand
+from app.services.ai_context import AIContextService
 
 
 @dataclass(slots=True, kw_only=True)
@@ -17,6 +18,7 @@ class FileService:
     storage_repository: FileStorageRepository
     project_repository: ProjectRepository
     settings: UploadSettings
+    ai_context_service: AIContextService | None = None
 
     async def upload_file(
         self,
@@ -52,6 +54,10 @@ class FileService:
         except Exception:
             await self.storage_repository.delete(storage_key)
             raise
+        await self._refresh_project_context(
+            project_id=file.project_id,
+            owner_user_id=owner_user_id,
+        )
         return FileResponse.model_validate(file)
 
     async def get_file(self, *, file_id: uuid.UUID, owner_user_id: uuid.UUID) -> FileResponse:
@@ -83,8 +89,18 @@ class FileService:
         file = await self.file_repository.get_owned(file_id=file_id, owner_user_id=owner_user_id)
         if file is None:
             raise UserAppError(code="not_found", message="File not found")
+        project_id = file.project_id
         await self.storage_repository.delete(file.storage_key)
         await self.file_repository.delete_file_record(file)
+        await self._refresh_project_context(project_id=project_id, owner_user_id=owner_user_id)
+
+    async def _refresh_project_context(self, *, project_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
+        if self.ai_context_service is None:
+            return
+        await self.ai_context_service.rebuild_project_context(
+            project_id=project_id,
+            owner_user_id=owner_user_id,
+        )
 
     async def _ensure_project_owned(
         self,

@@ -9,6 +9,7 @@ from app.models.task import Task
 from app.repository.files import FileRepository
 from app.repository.projects import ProjectRepository
 from app.repository.tasks import TaskRepository
+from app.services.ai_context import AIContextService
 from app.schemas.enums import TaskStatus
 from app.schemas.files import FileBriefResponse, TaskFileLinkResponse
 from app.schemas.tasks import (
@@ -26,6 +27,7 @@ class TaskService:
     task_repository: TaskRepository
     project_repository: ProjectRepository
     file_repository: FileRepository
+    ai_context_service: AIContextService | None = None
 
     async def list_tasks(self, filters: TaskFilters) -> PaginatedTasksResponse:
         if filters.project_id is not None:
@@ -56,6 +58,10 @@ class TaskService:
             status=command.status,
             priority=command.priority,
             due_at=command.due_at,
+        )
+        await self._refresh_project_context(
+            project_id=task.project_id,
+            owner_user_id=command.owner_user_id,
         )
         return TaskResponse.model_validate(task)
 
@@ -92,11 +98,17 @@ class TaskService:
             self._apply_status(task, command.status)
 
         task = await self.task_repository.update(task)
+        await self._refresh_project_context(
+            project_id=task.project_id,
+            owner_user_id=command.owner_user_id,
+        )
         return await self.get_task(task_id=task.id, owner_user_id=command.owner_user_id)
 
     async def delete_task(self, *, task_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
         task = await self._ensure_task_owned(task_id, owner_user_id)
+        project_id = task.project_id
         await self.task_repository.soft_delete(task)
+        await self._refresh_project_context(project_id=project_id, owner_user_id=owner_user_id)
 
     async def attach_file(
         self,
@@ -112,6 +124,8 @@ class TaskService:
         link = await self.task_repository.attach_file(task_id=task_id, file_id=file_id)
         if link is None:
             raise UserAppError(code="already_exists", message="File already attached to this task")
+        task = await self._ensure_task_owned(task_id, owner_user_id)
+        await self._refresh_project_context(project_id=task.project_id, owner_user_id=owner_user_id)
         return TaskFileLinkResponse.model_validate(link)
 
     async def detach_file(
@@ -123,6 +137,16 @@ class TaskService:
     ) -> None:
         await self._ensure_task_owned(task_id, owner_user_id)
         await self.task_repository.detach_file(task_id=task_id, file_id=file_id)
+        task = await self._ensure_task_owned(task_id, owner_user_id)
+        await self._refresh_project_context(project_id=task.project_id, owner_user_id=owner_user_id)
+
+    async def _refresh_project_context(self, *, project_id: uuid.UUID, owner_user_id: uuid.UUID) -> None:
+        if self.ai_context_service is None:
+            return
+        await self.ai_context_service.rebuild_project_context(
+            project_id=project_id,
+            owner_user_id=owner_user_id,
+        )
 
     async def _ensure_project_owned(
         self,

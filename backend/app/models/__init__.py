@@ -1,3 +1,4 @@
+from app.models.ai_context import ProjectAIContext
 from app.models.file import File, NoteFile, ProjectFile, TaskFile
 from app.models.note import Note
 from app.models.project import Project
@@ -11,6 +12,7 @@ __all__ = [
     "NoteFile",
     "NoteTag",
     "Project",
+    "ProjectAIContext",
     "ProjectFile",
     "Tag",
     "Task",

@@ -29,9 +29,16 @@ services:
       OKAK_POSTGRES__DATABASE: ${POSTGRES_DB:-okak}
       OKAK_AUTH__SECRET_KEY: ${OKAK_AUTH__SECRET_KEY:-change-me-in-production}
       OKAK_UPLOADS__UPLOADS_DIR: /app/uploads
-      OKAK_LLM__PROVIDER: ${OKAK_LLM__PROVIDER:-openai}
+      OKAK_LLM__PROVIDER: ${OKAK_LLM__PROVIDER:-gigachat}
       OKAK_LLM__OPENAI_API_KEY: ${OKAK_LLM__OPENAI_API_KEY:-}
       OKAK_LLM__QWEN_API_KEY: ${OKAK_LLM__QWEN_API_KEY:-}
+      OKAK_LLM__GIGACHAT_AUTH_KEY: ${OKAK_LLM__GIGACHAT_AUTH_KEY:-}
+      OKAK_LLM__GIGACHAT_SCOPE: ${OKAK_LLM__GIGACHAT_SCOPE:-GIGACHAT_API_PERS}
+      OKAK_LLM__GIGACHAT_MODEL: ${OKAK_LLM__GIGACHAT_MODEL:-GigaChat}
+      OKAK_LLM__GIGACHAT_BASE_URL: ${OKAK_LLM__GIGACHAT_BASE_URL:-https://gigachat.devices.sberbank.ru/api/v1}
+      OKAK_LLM__GIGACHAT_AUTH_URL: ${OKAK_LLM__GIGACHAT_AUTH_URL:-https://ngw.devices.sberbank.ru:9443/api/v2/oauth}
+      OKAK_LLM__GIGACHAT_IMAGE_MODEL: ${OKAK_LLM__GIGACHAT_IMAGE_MODEL:-GigaChat}
+      OKAK_LLM__GIGACHAT_VERIFY_SSL_CERTS: ${OKAK_LLM__GIGACHAT_VERIFY_SSL_CERTS:-true}
     command: >
       sh -c "alembic upgrade head &&
       uvicorn main:app --host 0.0.0.0 --port 8000"

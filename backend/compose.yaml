@@ -23,6 +23,7 @@ services:
     environment:
       OKAK_POSTGRES__HOST: postgres
       OKAK_UPLOADS__UPLOADS_DIR: /app/uploads
+      OKAK_LLM__PROVIDER: gigachat
     command: >
       sh -c "alembic upgrade head &&
       uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
