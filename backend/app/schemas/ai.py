@@ -13,3 +13,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     role: str
     content: str
+
+
+class TTSRequest(BaseModel):
+    text: str

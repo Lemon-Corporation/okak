@@ -19,10 +19,22 @@ export default function WidgetPage() {
   const recognitionRef = useRef<any>(null)
   const endTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  const playTTS = async (text: string) => {
+    try {
+      const audioUrl = await aiApi.tts(text)
+      const audio = new Audio(audioUrl)
+      audio.play().catch(console.error)
+      audio.onended = () => URL.revokeObjectURL(audioUrl)
+    } catch (err) {
+      console.error('TTS failed', err)
+    }
+  }
+
   const handleExpand = async () => {
     if (isExpanded) return
     await desktopResizeWidget(true)
     setIsExpanded(true)
+    playTTS('Привет')
     startRecording()
   }
 
@@ -102,12 +114,7 @@ export default function WidgetPage() {
     try {
       const res = await aiApi.chat([{ role: 'user', content: text }])
       setResponse(res.content)
-      
-      const synth = window.speechSynthesis
-      const utterance = new SpeechSynthesisUtterance(res.content)
-      utterance.lang = 'ru-RU'
-      synth.speak(utterance)
-      
+      await playTTS(res.content)
     } catch (err) {
       setResponse('Произошла ошибка')
     } finally {
@@ -196,6 +203,7 @@ export default function WidgetPage() {
             ? 'w-[400px] h-20 rounded-[2rem] bg-[#0a0a0c]/90 border border-white/10 shadow-2xl shadow-blue/20' 
             : 'w-14 h-14 rounded-full bg-transparent hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-blue/20'
         }`}
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <div className={`relative flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-500 z-20 overflow-hidden ${
           isExpanded ? 'w-16 h-16 mr-3 -ml-0.5' : 'w-full h-full'
@@ -204,7 +212,8 @@ export default function WidgetPage() {
           transform: 'translateZ(0)',
           WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           isolation: 'isolate',
-        }}>
+          WebkitAppRegion: 'no-drag'
+        } as React.CSSProperties}>
           
           {/* Base pure gradient for collapsed state */}
           <div className={`absolute inset-0 bg-gradient-to-br from-[#3b82f6] via-[#60a5fa] to-[#a3e635] rounded-full transition-opacity duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`} />
@@ -263,6 +272,7 @@ export default function WidgetPage() {
         {isExpanded && (
           <button 
             onClick={handleClose}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             className="absolute top-1/2 -translate-y-1/2 right-4 w-6 h-6 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors z-30"
           >
             <X className="w-4 h-4" />

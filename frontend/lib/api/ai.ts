@@ -13,4 +13,33 @@ export interface ChatResponse {
 export const aiApi = {
   chat: (messages: ChatMessage[]) =>
     api.post<ChatResponse>('/ai/chat', { messages }),
+  
+  tts: async (text: string) => {
+    // Determine base URL since we need native fetch to get Blob
+    const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'
+    
+    // We try to get token if auth cookie is not passed by Electron window
+    let token = ''
+    try {
+      token = localStorage.getItem('okak_access_token') || localStorage.getItem('auth_token') || ''
+    } catch {}
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    const res = await fetch(`${BASE_URL}/ai/tts`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ text }),
+    })
+    
+    if (!res.ok) throw new Error(`TTS Failed: ${res.status}`)
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  }
 }
