@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button'
 import {
   ArrowRight,
   CheckCircle2,
+  CheckSquare,
   ChevronRight,
   Command,
   FileText,
+  Files,
   FolderKanban,
   Layers3,
   Menu,
