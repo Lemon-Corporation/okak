@@ -24,7 +24,6 @@ import {
   Trash2,
   PinOff,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 export default function NotesPage() {
   const router = useRouter()
@@ -58,7 +57,7 @@ export default function NotesPage() {
   const handleCreateNote = async () => {
     const firstProjectId = projects[0]?.id ?? null
     if (!firstProjectId) {
-      alert('Сначала создайте проект')
+      router.push('/projects')
       return
     }
     const note = await createNote({

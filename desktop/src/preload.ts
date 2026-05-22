@@ -81,6 +81,11 @@ const api = {
   hideOverlay: () => ipcRenderer.invoke('app:hide-overlay'),
   toggleOverlay: () => ipcRenderer.invoke('app:toggle-overlay'),
   isOverlayVisible: () => ipcRenderer.invoke('app:is-overlay-visible'),
+  resizeWidget: (expanded: boolean) => ipcRenderer.invoke('app:resize-widget', expanded),
+  onToggleWidgetExpand: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('app:toggle-widget-expand')
+    ipcRenderer.on('app:toggle-widget-expand', () => callback())
+  }
 }
 
 contextBridge.exposeInMainWorld('electron', api)

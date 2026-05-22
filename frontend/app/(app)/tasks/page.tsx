@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,9 +67,9 @@ const priorityLabels: Record<TaskPriority, string> = {
 }
 
 const priorityColors: Record<TaskPriority, string> = {
-  low: 'bg-green-500',
-  medium: 'bg-yellow-500',
-  high: 'bg-red-500',
+  low: 'bg-emerald-500',
+  medium: 'bg-amber-500',
+  high: 'bg-rose-500',
 }
 
 const monthNames = [
@@ -240,6 +241,7 @@ const isSameDate = (firstDate: Date, secondDate: Date) =>
   firstDate.getDate() === secondDate.getDate()
 
 export default function TasksPage() {
+  const router = useRouter()
   const tasks = useAppStore((state) => state.tasks)
   const projects = useAppStore((state) => state.projects)
   const createTask = useAppStore((state) => state.createTask)
@@ -260,6 +262,7 @@ export default function TasksPage() {
   const [openCalendarFor, setOpenCalendarFor] = useState<'create' | 'edit' | null>(null)
   const [calendarMonth, setCalendarMonth] = useState(new Date())
 
+  const firstProjectId = projects[0]?.id ?? ''
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -318,6 +321,10 @@ export default function TasksPage() {
   }
 
   const handleOpenCreateTask = () => {
+    if (projects.length === 0) {
+      router.push('/projects')
+      return
+    }
     setActionError('')
     setOpenCalendarFor(null)
     setNewTask({

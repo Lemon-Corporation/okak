@@ -32,10 +32,10 @@ export default function SpacePage() {
   const completedTasksCount = tasks.filter((t) => t.status === 'done').length
 
   const stats = [
-    { label: 'Заметки', value: notes.length, icon: StickyNote, href: '/notes', color: 'bg-blue-500/10 text-blue-600' },
-    { label: 'Задачи', value: tasks.length, icon: CheckSquare, href: '/tasks', color: 'bg-green-500/10 text-green-600' },
-    { label: 'Проекты', value: projects.length, icon: FolderKanban, href: '/projects', color: 'bg-orange-500/10 text-orange-600' },
-    { label: 'Файлы', value: files.length, icon: Files, href: '/files', color: 'bg-purple-500/10 text-purple-600' },
+    { label: 'Заметки', value: notes.length, icon: StickyNote, href: '/notes', color: 'bg-blue/10 text-blue' },
+    { label: 'Задачи', value: tasks.length, icon: CheckSquare, href: '/tasks', color: 'bg-lime/10 text-lime-dark' },
+    { label: 'Проекты', value: projects.length, icon: FolderKanban, href: '/projects', color: 'bg-blue/10 text-blue-dark' },
+    { label: 'Файлы', value: files.length, icon: Files, href: '/files', color: 'bg-muted text-muted-foreground' },
   ]
 
   return (

@@ -58,6 +58,8 @@ export interface ElectronAPI {
   hideOverlay(): Promise<void>
   toggleOverlay(): Promise<void>
   isOverlayVisible(): Promise<boolean>
+  resizeWidget(expanded: boolean): Promise<void>
+  onToggleWidgetExpand(callback: () => void): void
 }
 
 declare global {
@@ -330,4 +332,9 @@ export async function desktopToggleOverlay(): Promise<void> {
 export async function desktopIsOverlayVisible(): Promise<boolean> {
   if (!isElectron()) return false
   return window.electron!.isOverlayVisible()
+}
+
+export async function desktopResizeWidget(expanded: boolean): Promise<void> {
+  if (!isElectron()) return
+  return window.electron!.resizeWidget(expanded)
 }

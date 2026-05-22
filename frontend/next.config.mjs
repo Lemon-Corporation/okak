@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: false,
+    buildActivityPosition: 'bottom-left',
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

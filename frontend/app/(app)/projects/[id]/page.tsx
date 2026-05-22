@@ -115,9 +115,13 @@ export default function ProjectDetailPage() {
     )
   }
 
-  const handleDelete = () => {
-    deleteProject(projectId)
-    router.push('/projects')
+  const handleDelete = async () => {
+    try {
+      await deleteProject(projectId)
+      router.push('/projects')
+    } catch {
+      // handled by store
+    }
   }
 
   const handleCreateNote = async () => {
