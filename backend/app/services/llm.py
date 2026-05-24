@@ -121,7 +121,7 @@ class LLMClient:
                     "RqUID": str(uuid.uuid4()),
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                data={"scope": self.settings.gigachat_scope},
+                data={"scope": "GIGACHAT_API_B2B"},
             )
             if response.status_code != 200:
                 print(f"GigaChat Auth Error {response.status_code}: {response.text}")
@@ -212,6 +212,8 @@ class LLMClient:
                 },
                 content=audio_data,
             )
+            if response.status_code != 200:
+                print(f"GigaChat STT Error {response.status_code}: {response.text}")
             response.raise_for_status()
 
         data = response.json()

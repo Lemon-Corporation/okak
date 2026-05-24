@@ -12,6 +12,12 @@ from app.repository.ai_context import (
 )
 from app.schemas.ai import AISource, AIUsedProject, ChatRequest, ChatResponse
 from app.services.llm import LLMClient
+from app.services.notes import NoteService
+from app.schemas.notes import NoteCreate
+from app.services.projects import ProjectService
+from app.schemas.projects import CreateProjectCommand
+from app.services.tasks import TaskService
+from app.schemas.tasks import CreateTaskCommand
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +139,9 @@ class AIAgentService:
     ai_context_repository: AIContextRepository
     project_agent_service: ProjectAgentService
     llm_client: LLMClient
+    note_service: NoteService | None = None
+    project_service: ProjectService | None = None
+    task_service: TaskService | None = None
 
     async def chat(
         self,
@@ -178,6 +187,86 @@ class AIAgentService:
             )
 
         function_call = self._extract_function_call(first_response)
+        
+        # 1. Сначала проверяем, нет ли кастомной текстовой команды [CREATE_NOTE: ...]
+        content = (first_response.get("content") or "").strip()
+        
+        # 1. Заметка
+        create_note_match = re.search(r'\[CREATE_NOTE:\s*project_id="([^"]+)",\s*title="([^"]+)",\s*content="([^"]+)"\]', content)
+        if create_note_match and self.note_service:
+            try:
+                p_id = uuid.UUID(create_note_match.group(1))
+                title = create_note_match.group(2)
+                note_content = create_note_match.group(3)
+                await self.note_service.create_note(
+                    owner_user_id=owner_user_id,
+                    project_id=p_id,
+                    data=NoteCreate(title=title, content=note_content)
+                )
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Я успешно создал заметку «{title}»!",
+                    conversation_id=request.conversation_id,
+                )
+            except Exception as e:
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Не удалось создать заметку: {e}",
+                    conversation_id=request.conversation_id,
+                )
+                
+        # 2. Проект
+        create_project_match = re.search(r'\[CREATE_PROJECT:\s*title="([^"]+)",\s*description="([^"]*)"\]', content)
+        if create_project_match and self.project_service:
+            try:
+                title = create_project_match.group(1)
+                desc = create_project_match.group(2)
+                await self.project_service.create_project(
+                    command=CreateProjectCommand(
+                        owner_user_id=owner_user_id,
+                        title=title,
+                        description=desc,
+                    )
+                )
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Я успешно создал проект «{title}»!",
+                    conversation_id=request.conversation_id,
+                )
+            except Exception as e:
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Не удалось создать проект: {e}",
+                    conversation_id=request.conversation_id,
+                )
+                
+        # 3. Задача
+        create_task_match = re.search(r'\[CREATE_TASK:\s*project_id="([^"]+)",\s*title="([^"]+)",\s*description="([^"]*)"\]', content)
+        if create_task_match and self.task_service:
+            try:
+                p_id = uuid.UUID(create_task_match.group(1))
+                title = create_task_match.group(2)
+                desc = create_task_match.group(3)
+                await self.task_service.create_task(
+                    command=CreateTaskCommand(
+                        owner_user_id=owner_user_id,
+                        project_id=p_id,
+                        title=title,
+                        description=desc,
+                    )
+                )
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Я успешно создал задачу «{title}»!",
+                    conversation_id=request.conversation_id,
+                )
+            except Exception as e:
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Не удалось создать задачу: {e}",
+                    conversation_id=request.conversation_id,
+                )
+
         if function_call is None:
             content = (first_response.get("content") or "").strip()
             if content:
@@ -299,6 +388,15 @@ class AIAgentService:
                     "You are the main workspace agent. You know only high-level project summaries. "
                     "If answering requires detailed project context, call ask_project_agent. "
                     "Do not invent project facts. Answer in the user's language.\n\n"
+                    "*** IMPORTANT TOOL INSTRUCTIONS ***\n"
+                    "If the user asks you to CREATE A NOTE, you must output EXACTLY the following text format and nothing else:\n"
+                    "[CREATE_NOTE: project_id=\"<uuid>\", title=\"<note title>\", content=\"<note content>\"]\n"
+                    "If the user asks you to CREATE A PROJECT, output EXACTLY:\n"
+                    "[CREATE_PROJECT: title=\"<project title>\", description=\"<project desc>\"]\n"
+                    "If the user asks you to CREATE A TASK, output EXACTLY:\n"
+                    "[CREATE_TASK: project_id=\"<uuid>\", title=\"<task title>\", description=\"<task desc>\"]\n"
+                    "If the user does not specify which project to add the note or task to, you MUST ask them to clarify before outputting the command.\n"
+                    "*** END OF INSTRUCTIONS ***\n\n"
                     f"Available project summaries:\n{self._format_project_summaries(project_summaries)}"
                 ),
             },

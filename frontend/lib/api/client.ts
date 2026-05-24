@@ -22,6 +22,14 @@ async function request<T>(
     headers.set('Content-Type', 'application/json')
   }
 
+  // Try to attach token from localStorage
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('okak_access_token')
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, { ...init, headers, credentials: 'include' })
 
   if (!res.ok) {

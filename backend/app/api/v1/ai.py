@@ -1,7 +1,7 @@
 from typing import Annotated
 import os
 
-from fastapi import APIRouter, Depends, status, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
@@ -10,6 +10,7 @@ from app.presentation.dependencies import get_container, get_current_user
 from app.schemas.ai import ChatRequest, ChatResponse, TTSRequest
 from app.schemas.auth import UserRecord
 from app.services.llm import chat as llm_chat
+from app.services.stt import transcribe_audio_whisper
 from app.services.tts import synthesize_speech
 
 router = APIRouter()
@@ -64,9 +65,6 @@ async def tts_endpoint(
         background=BackgroundTask(cleanup)
     )
 
-
-from fastapi import APIRouter, Depends, status, UploadFile, File, HTTPException
-...
 @router.post("/stt", status_code=status.HTTP_200_OK)
 async def stt_endpoint(
     container: Annotated[AppContainer, Depends(get_container)],
@@ -75,11 +73,11 @@ async def stt_endpoint(
     """Simple STT endpoint — no auth required."""
     try:
         audio_data = await file.read()
-        transcript = await container.llm_client.stt(audio_data)
+        transcript = await transcribe_audio_whisper(audio_data)
         return {"transcript": transcript}
     except Exception as e:
         import traceback
-        print(f"STT Error: {e}")
+        print(f"Local STT Error: {e}")
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

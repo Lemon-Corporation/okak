@@ -64,11 +64,11 @@ class LLMSettings(BaseModel):
     openai_api_key: str = ""
     qwen_api_key: str = ""
     gigachat_auth_key: str = ""
-    gigachat_scope: str = "GIGACHAT_API_PERS"
-    gigachat_model: str = "GigaChat"
+    gigachat_scope: str = "GIGACHAT_API_B2B"
+    gigachat_model: str = "GigaChat-2-Max"
     gigachat_base_url: str = "https://gigachat.devices.sberbank.ru/api/v1"
     gigachat_auth_url: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-    gigachat_image_model: str = "GigaChat"
+    gigachat_image_model: str = "GigaChat-2-Pro"
     gigachat_verify_ssl_certs: bool = True
     request_timeout_seconds: float = 60.0
 

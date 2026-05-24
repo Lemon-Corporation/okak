@@ -12,15 +12,23 @@ export interface ChatResponse {
 
 export const aiApi = {
   chat: (messages: ChatMessage[]) =>
-    api.post<ChatResponse>('/ai/ask', { messages }),
+    api.post<ChatResponse>('/ai/chat', { messages }),
   
   tts: async (text: string) => {
     // Determine base URL since we need native fetch to get Blob
     const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'
 
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('okak_access_token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+    }
+
     const res = await fetch(`${BASE_URL}/ai/tts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       credentials: 'include',
       body: JSON.stringify({ text }),
     })

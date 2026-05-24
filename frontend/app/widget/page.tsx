@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { desktopResizeWidget, desktopWriteLog } from '@/lib/electron'
-import { Sparkles, Bot, X } from 'lucide-react'
+import { Bot, Mic, BrainCircuit, AudioLines, Moon, X } from 'lucide-react'
 import { aiApi } from '@/lib/api'
 
 export default function WidgetPage() {
@@ -11,6 +11,9 @@ export default function WidgetPage() {
   const [transcript, setTranscript] = useState('')
   const [response, setResponse] = useState('')
   const [isThinking, setIsThinking] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isUnauthorized, setIsUnauthorized] = useState(false)
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([])
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -68,11 +71,25 @@ export default function WidgetPage() {
           try {
             logToDebug('Sending to STT...')
             const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+            const headers: HeadersInit = {}
+            if (typeof window !== 'undefined') {
+              const token = localStorage.getItem('okak_access_token')
+              if (token) headers['Authorization'] = `Bearer ${token}`
+            }
             const res = await fetch(`${BASE_URL}/ai/stt`, {
               method: 'POST',
+              headers,
               body: formData,
             })
             
+            if (res.status === 401) {
+              logToDebug('STT failed: Unauthorized')
+              setIsUnauthorized(true)
+              setResponse('Пожалуйста, авторизуйтесь')
+              await playTTS('Пожалуйста, авторизуйтесь в приложении')
+              return
+            }
+
             if (res.ok) {
               const { transcript: text } = await res.json()
               logToDebug('STT result:', text)
@@ -146,9 +163,14 @@ export default function WidgetPage() {
     return new Promise(async (resolve) => {
       try {
         const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+        const headers: HeadersInit = { 'Content-Type': 'application/json' }
+        if (typeof window !== 'undefined') {
+          const token = localStorage.getItem('okak_access_token')
+          if (token) headers['Authorization'] = `Bearer ${token}`
+        }
         const res = await fetch(`${BASE_URL}/ai/tts`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ text }),
         })
 
@@ -165,20 +187,26 @@ export default function WidgetPage() {
         const audio = new Audio()
         audio.src = audioUrl
         
-        audio.onplay = () => logToDebug('Audio playback started')
+        audio.onplay = () => {
+          logToDebug('Audio playback started')
+          setIsPlaying(true)
+        }
         audio.onerror = (e: any) => {
           logToDebug('Audio element error:', e)
+          setIsPlaying(false)
           resolve()
         }
         
         audio.onended = () => {
           logToDebug('Audio playback ended')
+          setIsPlaying(false)
           URL.revokeObjectURL(audioUrl)
           resolve()
         }
 
         await audio.play().catch(e => {
           logToDebug('Audio play() failed:', e)
+          setIsPlaying(false)
           resolve()
         })
       } catch (err) {
@@ -194,6 +222,7 @@ export default function WidgetPage() {
     stopRecording()
     setTranscript('')
     setResponse('')
+    setMessages([]) // clear context on close
     // Wait for collapse animation before shrinking window
     setTimeout(async () => {
       await desktopResizeWidget(false)
@@ -225,14 +254,30 @@ export default function WidgetPage() {
   const handleSendToAI = async (text: string) => {
     logToDebug('Sending to AI:', text)
     setIsThinking(true)
+    
+    // Add user message to local state immediately
+    const userMessage = { role: 'user' as const, content: text };
+    const currentMessages = [...messages, userMessage];
+    setMessages(currentMessages);
+
     try {
-      const res = await aiApi.chat([{ role: 'user', content: text }])
+      const res = await aiApi.chat(currentMessages)
       logToDebug('AI Response received:', res)
       setResponse(res.content)
+      
+      // Add assistant response to local state
+      setMessages([...currentMessages, { role: 'assistant', content: res.content }]);
+      
       await playTTS(res.content)
-    } catch (err) {
+    } catch (err: any) {
       logToDebug('handleSendToAI error:', err)
-      setResponse('Произошла ошибка')
+      if (err.status === 401) {
+        setIsUnauthorized(true)
+        setResponse('Пожалуйста, авторизуйтесь')
+        await playTTS('Пожалуйста, авторизуйтесь в приложении')
+      } else {
+        setResponse('Произошла ошибка')
+      }
     } finally {
       setIsThinking(false)
     }
@@ -352,14 +397,14 @@ export default function WidgetPage() {
           } as React.CSSProperties}>
           
           {/* Base pure gradient for collapsed state */}
-          <div className={`absolute inset-0 bg-gradient-to-br from-[#3b82f6] via-[#60a5fa] to-[#a3e635] rounded-full transition-opacity duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`} />
+          <div className={`absolute inset-0 bg-gradient-to-br ${isUnauthorized ? 'from-red-500 via-red-600 to-orange-500' : 'from-[#3b82f6] via-[#60a5fa] to-[#a3e635]'} rounded-full transition-opacity duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`} />
 
           {/* Expanded mode animated layers */}
           <div className={`absolute inset-0 transition-opacity duration-500 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
-            <div className="absolute inset-0 bg-blue-dark opacity-50 blur-[10px] rounded-full" />
-            <div className="absolute -inset-[50%] animate-[spin_6s_linear_infinite] rounded-full bg-[conic-gradient(from_0deg,var(--color-blue),var(--color-lime),var(--color-blue-dark),var(--color-blue))] opacity-80 mix-blend-screen blur-[4px]" />
-            <div className="absolute -inset-[50%] animate-[spin_10s_ease-in-out_infinite_reverse] rounded-full bg-[conic-gradient(from_180deg,transparent,var(--color-blue),var(--color-lime-dark),transparent)] opacity-90 mix-blend-overlay blur-[2px]" />
-            <div className="absolute inset-1 rounded-full bg-gradient-to-tr from-lime/40 to-blue/40 blur-[2px] animate-[pulse_4s_ease-in-out_infinite]" />
+            <div className={`absolute inset-0 ${isUnauthorized ? 'bg-red-900' : 'bg-blue-dark'} opacity-50 blur-[10px] rounded-full`} />
+            <div className={`absolute -inset-[50%] animate-[spin_6s_linear_infinite] rounded-full ${isUnauthorized ? 'bg-[conic-gradient(from_0deg,var(--color-red-500),var(--color-orange-500),var(--color-red-900),var(--color-red-500))]' : 'bg-[conic-gradient(from_0deg,var(--color-blue),var(--color-lime),var(--color-blue-dark),var(--color-blue))]'} opacity-80 mix-blend-screen blur-[4px]`} />
+            <div className={`absolute -inset-[50%] animate-[spin_10s_ease-in-out_infinite_reverse] rounded-full ${isUnauthorized ? 'bg-[conic-gradient(from_180deg,transparent,var(--color-red-500),var(--color-orange-700),transparent)]' : 'bg-[conic-gradient(from_180deg,transparent,var(--color-blue),var(--color-lime-dark),transparent)]'} opacity-90 mix-blend-overlay blur-[2px]`} />
+            <div className={`absolute inset-1 rounded-full bg-gradient-to-tr ${isUnauthorized ? 'from-orange-500/40 to-red-500/40' : 'from-lime/40 to-blue/40'} blur-[2px] animate-[pulse_4s_ease-in-out_infinite]`} />
             <div className="absolute inset-[1px] rounded-full bg-background/40 backdrop-blur-[4px] border border-white/20 transition-colors" />
           </div>
 
@@ -371,9 +416,24 @@ export default function WidgetPage() {
             className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300 pointer-events-none ${isRecording ? 'opacity-100' : 'opacity-0'}`}
           />
 
-          {/* Only show icon in expanded mode */}
-          <div className={`relative z-10 text-white/90 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
-            <Bot className="w-5 h-5" />
+          {/* Dynamic Avatar */}
+          <div className={`relative z-10 transition-all duration-300 ${isExpanded ? 'opacity-100' : 'opacity-80'} ${
+            isThinking ? 'text-blue-400' : 
+            isPlaying ? 'text-lime' : 
+            isRecording ? 'text-red-400' : 
+            'text-white/90'
+          }`}>
+            {isRecording ? (
+              <Mic className="w-5 h-5 animate-pulse" />
+            ) : isThinking ? (
+              <BrainCircuit className="w-5 h-5 animate-bounce" />
+            ) : isPlaying ? (
+              <AudioLines className="w-5 h-5 animate-pulse" />
+            ) : !isExpanded ? (
+              <Moon className="w-5 h-5" />
+            ) : (
+              <Bot className="w-5 h-5" />
+            )}
           </div>
         </div>
 

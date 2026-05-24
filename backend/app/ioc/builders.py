@@ -41,12 +41,6 @@ def build_container(*, settings: Settings, session: AsyncSession) -> AppContaine
         ai_context_repository=ai_context_repository,
         llm_client=llm_client,
     )
-    ai_agent_service = AIAgentService(
-        ai_context_repository=ai_context_repository,
-        project_agent_service=project_agent_service,
-        llm_client=llm_client,
-    )
-
     auth_service = AuthService(
         user_repository=user_repository,
         settings=settings.auth,
@@ -79,6 +73,15 @@ def build_container(*, settings: Settings, session: AsyncSession) -> AppContaine
         ai_context_service=ai_context_service,
     )
     search_service = SearchService(search_repository=search_repository)
+
+    ai_agent_service = AIAgentService(
+        ai_context_repository=ai_context_repository,
+        project_agent_service=project_agent_service,
+        llm_client=llm_client,
+        note_service=note_service,
+        project_service=project_service,
+        task_service=task_service,
+    )
 
     return AppContainer(
         settings=settings,
