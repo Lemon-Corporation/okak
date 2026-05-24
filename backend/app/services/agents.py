@@ -13,7 +13,8 @@ from app.repository.ai_context import (
 from app.schemas.ai import AISource, AIUsedProject, ChatRequest, ChatResponse
 from app.services.llm import LLMClient
 from app.services.notes import NoteService
-from app.schemas.notes import NoteCreate
+from app.schemas.notes import CreateNoteCommand
+from app.schemas.enums import NoteStatus
 from app.services.projects import ProjectService
 from app.schemas.projects import CreateProjectCommand
 from app.services.tasks import TaskService
@@ -199,9 +200,13 @@ class AIAgentService:
                 title = create_note_match.group(2)
                 note_content = create_note_match.group(3)
                 await self.note_service.create_note(
-                    owner_user_id=owner_user_id,
-                    project_id=p_id,
-                    data=NoteCreate(title=title, content=note_content)
+                    command=CreateNoteCommand(
+                        owner_user_id=owner_user_id,
+                        project_id=p_id,
+                        title=title,
+                        content=note_content,
+                        status=NoteStatus.DRAFT
+                    )
                 )
                 return ChatResponse(
                     role="assistant",
