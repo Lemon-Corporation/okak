@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { desktopResizeWidget } from '@/lib/electron'
+import { desktopResizeWidget, desktopWriteLog } from '@/lib/electron'
 import { Sparkles, Bot, X } from 'lucide-react'
 import { aiApi } from '@/lib/api'
 
@@ -19,23 +19,173 @@ export default function WidgetPage() {
   const recognitionRef = useRef<any>(null)
   const endTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const playTTS = async (text: string) => {
+  const logToDebug = (message: string, data?: any) => {
     try {
-      const audioUrl = await aiApi.tts(text)
-      const audio = new Audio(audioUrl)
-      audio.play().catch(console.error)
-      audio.onended = () => URL.revokeObjectURL(audioUrl)
+      const logMessage = `[${new Date().toISOString()}] ${message} ${data !== undefined ? (typeof data === 'object' ? JSON.stringify(data) : data) : ''}`;
+      console.log(message, data !== undefined ? data : '');
+      desktopWriteLog(logMessage);
     } catch (err) {
-      console.error('TTS failed', err)
+      console.error('Logging failed', err);
+    }
+  };
+
+  const startRecording = async () => {
+    logToDebug('startRecording starting...')
+    try {
+      logToDebug('Requesting microphone access...')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      logToDebug('Microphone access granted, stream:', stream.id)
+      
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+      audioContextRef.current = new AudioContext()
+      logToDebug('AudioContext created, state:', audioContextRef.current.state)
+      
+      analyserRef.current = audioContextRef.current.createAnalyser()
+      const source = audioContextRef.current.createMediaStreamSource(stream)
+      source.connect(analyserRef.current)
+      analyserRef.current.fftSize = 64
+      
+      setIsRecording(true)
+      logToDebug('isRecording set to true, starting visualizer')
+      drawVisualizer()
+
+      // Set up MediaRecorder for STT
+      const mediaRecorder = new MediaRecorder(stream)
+      const chunks: Blob[] = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        logToDebug('Recording stopped, blob size:', audioBlob.size)
+        
+        if (audioBlob.size > 1000) {
+          const formData = new FormData()
+          formData.append('file', audioBlob, 'voice.webm')
+          
+          try {
+            logToDebug('Sending to STT...')
+            const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+            const res = await fetch(`${BASE_URL}/ai/stt`, {
+              method: 'POST',
+              body: formData,
+            })
+            
+            if (res.ok) {
+              const { transcript: text } = await res.json()
+              logToDebug('STT result:', text)
+              if (text && text.trim()) {
+                setTranscript(text)
+                handleSendToAI(text)
+              }
+            } else {
+              logToDebug('STT failed:', res.status)
+            }
+          } catch (err) {
+            logToDebug('STT request error:', err)
+          }
+        }
+        
+        setIsRecording(false)
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      // Voice activity detection (simple silence timeout)
+      let silenceTimer: NodeJS.Timeout
+      const checkSilence = () => {
+        const dataArray = new Uint8Array(analyserRef.current!.frequencyBinCount)
+        analyserRef.current!.getByteFrequencyData(dataArray)
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length
+        
+        if (average < 10) { // Threshold for silence
+          if (!silenceTimer) {
+            silenceTimer = setTimeout(() => {
+              logToDebug('Silence detected, stopping recorder')
+              mediaRecorder.stop()
+            }, 2000)
+          }
+        } else {
+          if (silenceTimer) {
+            clearTimeout(silenceTimer)
+            silenceTimer = null as any
+          }
+        }
+        
+        if (mediaRecorder.state === 'recording') {
+          requestAnimationFrame(checkSilence)
+        }
+      }
+
+      mediaRecorder.start()
+      logToDebug('MediaRecorder started')
+      requestAnimationFrame(checkSilence)
+
+    } catch (err) {
+      logToDebug('Error accessing microphone:', err)
     }
   }
 
-  const handleExpand = async () => {
-    if (isExpanded) return
-    await desktopResizeWidget(true)
-    setIsExpanded(true)
-    playTTS('Привет')
-    startRecording()
+  const stopRecording = () => {
+    logToDebug('stopRecording called')
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+    }
+    setIsRecording(false)
+  }
+
+  const playTTS = async (text: string): Promise<void> => {
+    logToDebug('playTTS starting for:', text)
+    return new Promise(async (resolve) => {
+      try {
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+        const res = await fetch(`${BASE_URL}/ai/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        })
+
+        if (!res.ok) {
+          logToDebug('TTS fetch failed:', res.status)
+          resolve()
+          return
+        }
+
+        const blob = await res.blob()
+        logToDebug('TTS blob received, size:', blob.size)
+        
+        const audioUrl = URL.createObjectURL(blob)
+        const audio = new Audio()
+        audio.src = audioUrl
+        
+        audio.onplay = () => logToDebug('Audio playback started')
+        audio.onerror = (e: any) => {
+          logToDebug('Audio element error:', e)
+          resolve()
+        }
+        
+        audio.onended = () => {
+          logToDebug('Audio playback ended')
+          URL.revokeObjectURL(audioUrl)
+          resolve()
+        }
+
+        await audio.play().catch(e => {
+          logToDebug('Audio play() failed:', e)
+          resolve()
+        })
+      } catch (err) {
+        logToDebug('TTS failed', err)
+        resolve()
+      }
+    })
   }
 
   const handleClose = async (e: React.MouseEvent) => {
@@ -50,72 +200,38 @@ export default function WidgetPage() {
     }, 500)
   }
 
-  const startRecording = async () => {
+  const handleExpand = async () => {
+    logToDebug('handleExpand called');
+    if (isExpanded) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext
-      audioContextRef.current = new AudioContext()
-      analyserRef.current = audioContextRef.current.createAnalyser()
-      const source = audioContextRef.current.createMediaStreamSource(stream)
-      source.connect(analyserRef.current)
-      analyserRef.current.fftSize = 64
+      setIsExpanded(true);
+      logToDebug('isExpanded set to true');
       
-      setIsRecording(true)
-      drawVisualizer()
+      // 1. Resize widget
+      await desktopResizeWidget(true);
+      logToDebug('desktopResizeWidget(true) done');
 
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition()
-        recognition.lang = 'ru-RU'
-        recognition.interimResults = true
-        recognition.continuous = true
-
-        recognition.onresult = (event: any) => {
-          let currentTranscript = ''
-          for (let i = 0; i < event.results.length; i++) {
-            currentTranscript += event.results[i][0].transcript
-          }
-          setTranscript(currentTranscript)
-
-          if (endTimeoutRef.current) clearTimeout(endTimeoutRef.current)
-          endTimeoutRef.current = setTimeout(() => {
-            recognition.stop()
-          }, 2000)
-        }
-
-        recognition.onend = () => {
-          setIsRecording(false)
-          if (endTimeoutRef.current) clearTimeout(endTimeoutRef.current)
-        }
-
-        recognitionRef.current = recognition
-        recognition.start()
-      }
+      // 2. Play greeting and WAIT for it to finish
+      await playTTS('Привет');
+      
+      // 3. Start recording ONLY after greeting
+      startRecording();
+      
     } catch (err) {
-      console.error('Error accessing microphone', err)
+      logToDebug('handleExpand error:', err);
     }
-  }
-
-  const stopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-    }
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current)
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-    }
-    setIsRecording(false)
-  }
+  };
 
   const handleSendToAI = async (text: string) => {
+    logToDebug('Sending to AI:', text)
     setIsThinking(true)
     try {
       const res = await aiApi.chat([{ role: 'user', content: text }])
+      logToDebug('AI Response received:', res)
       setResponse(res.content)
       await playTTS(res.content)
     } catch (err) {
+      logToDebug('handleSendToAI error:', err)
       setResponse('Произошла ошибка')
     } finally {
       setIsThinking(false)
@@ -124,6 +240,7 @@ export default function WidgetPage() {
 
   useEffect(() => {
     if (!isRecording && transcript.trim() && recognitionRef.current) {
+      logToDebug('Voice input finished, transcript:', transcript.trim())
       handleSendToAI(transcript.trim())
       recognitionRef.current = null
     }
@@ -195,25 +312,44 @@ export default function WidgetPage() {
   }
 
   return (
-    <div className="flex h-full w-full justify-end p-5 overflow-hidden">
+    <div 
+      className={`flex h-full w-full justify-end overflow-hidden ${isExpanded ? 'p-2' : 'p-0'}`}
+    >
       <div 
-        onClick={handleExpand}
-        className={`group relative flex items-center p-1.5 backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+        onClick={(e) => {
+          if (!isExpanded) {
+            e.preventDefault();
+            e.stopPropagation();
+            logToDebug('Outer div clicked');
+            handleExpand();
+          }
+        }}
+        className={`group relative flex items-center backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
           isExpanded 
-            ? 'w-[400px] h-20 rounded-[2rem] bg-[#0a0a0c]/90 border border-white/10 shadow-2xl shadow-blue/20' 
+            ? 'w-[400px] h-20 rounded-[2rem] bg-[#0a0a0c]/90 border border-white/10 shadow-2xl shadow-blue/20 p-1.5' 
             : 'w-14 h-14 rounded-full bg-transparent hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-blue/20'
         }`}
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        style={{ 
+          WebkitAppRegion: isExpanded ? 'drag' : 'none',
+        } as React.CSSProperties}
       >
-        <div className={`relative flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-500 z-20 overflow-hidden ${
-          isExpanded ? 'w-16 h-16 mr-3 -ml-0.5' : 'w-full h-full'
-        }`}
-        style={{
-          transform: 'translateZ(0)',
-          WebkitMaskImage: '-webkit-radial-gradient(white, black)',
-          isolation: 'isolate',
-          WebkitAppRegion: 'no-drag'
-        } as React.CSSProperties}>
+        <div 
+          onClick={(e) => {
+            if (isExpanded) return;
+            e.preventDefault();
+            e.stopPropagation();
+            logToDebug('Inner circle clicked');
+            handleExpand();
+          }}
+          className={`relative flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-500 z-20 overflow-hidden ${
+            isExpanded ? 'w-16 h-16 mr-3 -ml-0.5' : 'w-full h-full'
+          }`}
+          style={{
+            transform: 'translateZ(0)',
+            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
+            isolation: 'isolate',
+            WebkitAppRegion: 'no-drag',
+          } as React.CSSProperties}>
           
           {/* Base pure gradient for collapsed state */}
           <div className={`absolute inset-0 bg-gradient-to-br from-[#3b82f6] via-[#60a5fa] to-[#a3e635] rounded-full transition-opacity duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`} />
@@ -241,9 +377,12 @@ export default function WidgetPage() {
           </div>
         </div>
 
-        <div className={`flex-1 overflow-hidden transition-all duration-500 flex flex-col justify-center pr-8 z-10 ${
-          isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 w-0 hidden'
-        }`}>
+        <div 
+          className={`flex-1 overflow-hidden transition-all duration-500 flex flex-col justify-center pr-8 z-10 ${
+            isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 w-0 hidden'
+          }`}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           {isThinking ? (
             <div className="flex items-center gap-2">
               <span className="text-white/80 font-medium text-sm">ОКАК думает</span>
@@ -259,11 +398,11 @@ export default function WidgetPage() {
             </p>
           ) : (
             <div className="flex flex-col">
-              <span className="text-[10px] text-lime/80 font-bold uppercase tracking-wider mb-0.5">
+              <span className="text-[10px] text-lime/80 font-bold uppercase tracking-wider mb-1">
                 {isRecording ? 'Слушаю вас...' : 'Ассистент'}
               </span>
-              <p className="text-white text-sm line-clamp-1 opacity-90">
-                {transcript || 'Произнесите запрос'}
+              <p className="text-white text-sm line-clamp-1 opacity-90 mt-1">
+                {transcript || 'Слушаю...'}
               </p>
             </div>
           )}

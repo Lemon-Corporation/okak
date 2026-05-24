@@ -331,7 +331,8 @@ function createWidgetWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
+      autoplayPolicy: 'no-user-gesture-required',
     },
   })
 
@@ -339,16 +340,43 @@ function createWidgetWindow(): void {
     ? 'http://localhost:3000/widget'
     : `http://localhost:${process.env.PORT || '3000'}/widget`
 
-  widgetWindow.loadURL(widgetUrl).catch((err) => {
+  widgetWindow.loadURL(widgetUrl).then(() => {
+    log.info('[widget] URL loaded successfully');
+    widgetWindow?.show();
+  }).catch((err) => {
     log.error('[widget] failed to load:', err)
   })
 
+  widgetWindow.webContents.on('did-finish-load', () => {
+    log.info('[widget] did-finish-load');
+    if (isDev) widgetWindow?.webContents.openDevTools({ mode: 'detach' });
+    widgetWindow?.show();
+  });
+
+  widgetWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    log.error('[widget] did-fail-load:', errorCode, errorDescription);
+  });
+
   widgetWindow.once('ready-to-show', () => {
-    widgetWindow?.showInactive()
+    log.info('[widget] ready-to-show, showing window');
+    widgetWindow?.show();
   })
 
   widgetWindow.on('closed', () => {
     widgetWindow = null
+  })
+
+  // Auto-grant permissions for microphone and other media
+  widgetWindow.webContents.session.setPermissionCheckHandler((webContents, permission) => {
+    const allowed = ['media', 'audioCapture', 'microphone']
+    if (allowed.includes(permission)) return true
+    return false
+  })
+
+  widgetWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['media', 'audioCapture', 'microphone']
+    if (allowed.includes(permission)) return callback(true)
+    callback(false)
   })
 }
 
@@ -842,6 +870,18 @@ ipcMain.handle('app:resize-widget', (_event, expanded: boolean) => {
     }
   }
 })
+
+  ipcMain.on('app:write-log', (_event, message: string) => {
+    const fs = require('fs');
+    const path = require('path');
+    const logPath = '/Users/alexganyak/Documents/GitHub/okak/debug.log';
+    try {
+      log.info('[Renderer]:', message);
+      fs.appendFileSync(logPath, message + '\n');
+    } catch (err) {
+      console.error('Failed to write to debug.log:', err);
+    }
+  })
 
 // Find in page
 ipcMain.handle('app:find-in-page', (_event, text: string) => {

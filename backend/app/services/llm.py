@@ -88,7 +88,7 @@ class LLMClient:
 
         async with httpx.AsyncClient(
             timeout=self.settings.request_timeout_seconds,
-            verify=self.settings.gigachat_verify_ssl_certs,
+            verify=False, # Disable SSL verification for GigaChat
         ) as client:
             response = await client.post(
                 f"{self.settings.gigachat_base_url.rstrip('/')}/chat/completions",
@@ -112,7 +112,7 @@ class LLMClient:
 
         async with httpx.AsyncClient(
             timeout=self.settings.request_timeout_seconds,
-            verify=self.settings.gigachat_verify_ssl_certs,
+            verify=False, # Disable SSL verification for GigaChat Auth
         ) as client:
             response = await client.post(
                 self.settings.gigachat_auth_url,
@@ -123,6 +123,8 @@ class LLMClient:
                 },
                 data={"scope": self.settings.gigachat_scope},
             )
+            if response.status_code != 200:
+                print(f"GigaChat Auth Error {response.status_code}: {response.text}")
             response.raise_for_status()
 
         data = response.json()
@@ -183,6 +185,37 @@ class LLMClient:
         response = await client.chat.completions.create(**kwargs)
         return response.choices[0].message.model_dump()
 
+
+    async def stt(self, audio_data: bytes) -> str:
+        """Transcribe audio using the configured provider."""
+        if self.settings.provider == "gigachat":
+            return await self._gigachat_stt(audio_data)
+        raise LLMProviderUnavailable(f"STT not supported for provider: {self.settings.provider}")
+
+    async def _gigachat_stt(self, audio_data: bytes) -> str:
+        import httpx
+
+        if not self.settings.gigachat_auth_key:
+            raise LLMProviderUnavailable("GigaChat credentials are not configured")
+
+        token = await self._get_gigachat_token()
+        
+        async with httpx.AsyncClient(
+            timeout=self.settings.request_timeout_seconds,
+            verify=False, # Disable SSL verification for GigaChat STT
+        ) as client:
+            response = await client.post(
+                "https://gigachat.devices.sberbank.ru/api/v1/speech/transcriptions",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "audio/webm",
+                },
+                content=audio_data,
+            )
+            response.raise_for_status()
+
+        data = response.json()
+        return data.get("result", [""])[0]
 
 async def chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
     """Send messages to the configured LLM provider and return its response."""

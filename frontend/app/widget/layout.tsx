@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { desktopWriteLog } from '@/lib/electron'
 
 export default function WidgetLayout({
   children,
@@ -8,6 +9,7 @@ export default function WidgetLayout({
   children: React.ReactNode
 }) {
   useEffect(() => {
+    desktopWriteLog('WidgetLayout mounted');
     document.body.style.backgroundColor = 'transparent'
     document.documentElement.style.backgroundColor = 'transparent'
     

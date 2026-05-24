@@ -59,6 +59,7 @@ export interface ElectronAPI {
   toggleOverlay(): Promise<void>
   isOverlayVisible(): Promise<boolean>
   resizeWidget(expanded: boolean): Promise<void>
+  writeLog(message: string): void
   onToggleWidgetExpand(callback: () => void): void
 }
 
@@ -337,4 +338,12 @@ export async function desktopIsOverlayVisible(): Promise<boolean> {
 export async function desktopResizeWidget(expanded: boolean): Promise<void> {
   if (!isElectron()) return
   return window.electron!.resizeWidget(expanded)
+}
+
+export function desktopWriteLog(message: string): void {
+  if (!isElectron()) {
+    console.log('[LOG]:', message)
+    return
+  }
+  window.electron!.writeLog(message)
 }
