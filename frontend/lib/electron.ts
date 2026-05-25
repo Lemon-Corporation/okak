@@ -59,8 +59,11 @@ export interface ElectronAPI {
   toggleOverlay(): Promise<void>
   isOverlayVisible(): Promise<boolean>
   resizeWidget(expanded: boolean): Promise<void>
+  getWidgetBounds(): Promise<{ x: number; y: number; width: number; height: number } | null>
+  setWidgetBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<{ x: number; y: number; width: number; height: number } | null>
   writeLog(message: string): void
   onToggleWidgetExpand(callback: () => void): void
+  onHideWidget(callback: () => void): void
 }
 
 declare global {
@@ -340,10 +343,25 @@ export async function desktopResizeWidget(expanded: boolean): Promise<void> {
   return window.electron!.resizeWidget(expanded)
 }
 
+export async function desktopGetWidgetBounds(): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  if (!isElectron()) return null
+  return window.electron!.getWidgetBounds()
+}
+
+export async function desktopSetWidgetBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  if (!isElectron()) return null
+  return window.electron!.setWidgetBounds(bounds)
+}
+
 export function desktopWriteLog(message: string): void {
   if (!isElectron()) {
     console.log('[LOG]:', message)
     return
   }
   window.electron!.writeLog(message)
+}
+
+export function onDesktopHideWidget(callback: () => void): void {
+  if (!isElectron()) return
+  window.electron!.onHideWidget(callback)
 }

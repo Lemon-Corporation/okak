@@ -274,6 +274,59 @@ class AIAgentService:
 
         if function_call is None:
             content = (first_response.get("content") or "").strip()
+
+            # Fallback: AI ignored creation instructions but user clearly asked to create something
+            # and there is exactly one project — auto-create with sensible defaults.
+            if content and not any((create_note_match, create_project_match, create_task_match)):
+                if len(project_summaries) == 1:
+                    single_project = project_summaries[0]
+                    p_id = single_project.project.id
+                    q_lower = question.lower()
+
+                    note_create_keywords = re.search(r'(созд[а-я]*|нов(ая|ую)|задать|добав(ить|ь)|сдел(ать|ай))\s+замет[а-я]*', q_lower)
+                    task_create_keywords = re.search(r'(созд[а-я]*|нов(ая|ую)|добав(ить|ь)|сдел(ать|ай))\s+задач[а-я]*', q_lower)
+
+                    if note_create_keywords and self.note_service:
+                        try:
+                            title_match = re.search(r'заметк[а-я]*\s+"([^"]+)"', question) or re.search(r'заметк[а-я]*\s+«([^»]+)»', question)
+                            title = title_match.group(1) if title_match else "Новая заметка"
+                            await self.note_service.create_note(
+                                command=CreateNoteCommand(
+                                    owner_user_id=owner_user_id,
+                                    project_id=p_id,
+                                    title=title,
+                                    content=question,
+                                    status=NoteStatus.DRAFT,
+                                )
+                            )
+                            return ChatResponse(
+                                role="assistant",
+                                content=f"Я создал заметку «{title}» в проекте «{single_project.project.title}».",
+                                conversation_id=request.conversation_id,
+                            )
+                        except Exception:
+                            pass
+
+                    if task_create_keywords and self.task_service:
+                        try:
+                            title_match = re.search(r'задач[а-я]*\s+"([^"]+)"', question) or re.search(r'задач[а-я]*\s+«([^»]+)»', question)
+                            title = title_match.group(1) if title_match else "Новая задача"
+                            await self.task_service.create_task(
+                                command=CreateTaskCommand(
+                                    owner_user_id=owner_user_id,
+                                    project_id=p_id,
+                                    title=title,
+                                    description=question,
+                                )
+                            )
+                            return ChatResponse(
+                                role="assistant",
+                                content=f"Я создал задачу «{title}» в проекте «{single_project.project.title}».",
+                                conversation_id=request.conversation_id,
+                            )
+                        except Exception:
+                            pass
+
             if content:
                 return ChatResponse(
                     role=first_response.get("role", "assistant"),
@@ -391,16 +444,21 @@ class AIAgentService:
                 "role": "system",
                 "content": (
                     "You are the main workspace agent. You know only high-level project summaries. "
-                    "If answering requires detailed project context, call ask_project_agent. "
-                    "Do not invent project facts. Answer in the user's language.\n\n"
-                    "*** IMPORTANT TOOL INSTRUCTIONS ***\n"
-                    "If the user asks you to CREATE A NOTE, you must output EXACTLY the following text format and nothing else:\n"
+                    "Answer in the user's language. Do not invent project facts.\n\n"
+                    "*** CREATION COMMANDS — HIGHEST PRIORITY ***\n"
+                    "If the user asks you to create ANYTHING (note, project, task), you MUST output ONLY the corresponding command. "
+                    "DO NOT describe the project. DO NOT ask unnecessary questions. DO NOT call ask_project_agent. "
+                    "JUST output the command and nothing else.\n\n"
+                    "Formats (use EXACTLY, with real project IDs from the list below):\n"
                     "[CREATE_NOTE: project_id=\"<uuid>\", title=\"<note title>\", content=\"<note content>\"]\n"
-                    "If the user asks you to CREATE A PROJECT, output EXACTLY:\n"
                     "[CREATE_PROJECT: title=\"<project title>\", description=\"<project desc>\"]\n"
-                    "If the user asks you to CREATE A TASK, output EXACTLY:\n"
-                    "[CREATE_TASK: project_id=\"<uuid>\", title=\"<task title>\", description=\"<task desc>\"]\n"
-                    "If the user does not specify which project to add the note or task to, you MUST ask them to clarify before outputting the command.\n"
+                    "[CREATE_TASK: project_id=\"<uuid>\", title=\"<task title>\", description=\"<task desc>\"]\n\n"
+                    "If the user mentions 'project' but does not specify which one, and there is ONLY ONE project available, "
+                    "AUTOMATICALLY use that project's id. Do NOT ask to clarify when only one project exists.\n\n"
+                    "Examples:\n"
+                    'User: "Создай заметку в проекте" -> Your output: [CREATE_NOTE: project_id="<the_only_project_id>", title="Новая заметка", content=""]\n'
+                    'User: "Новая задача" -> Your output: [CREATE_TASK: project_id="<the_only_project_id>", title="Новая задача", description=""]\n'
+                    'User: "Как дела?" -> Normal answer (or call ask_project_agent if needed).\n'
                     "*** END OF INSTRUCTIONS ***\n\n"
                     f"Available project summaries:\n{self._format_project_summaries(project_summaries)}"
                 ),

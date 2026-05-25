@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { desktopResizeWidget, desktopWriteLog } from '@/lib/electron'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { desktopGetWidgetBounds, desktopResizeWidget, desktopSetWidgetBounds, desktopWriteLog, onDesktopHideWidget } from '@/lib/electron'
 import { Bot, Mic, BrainCircuit, AudioLines, Moon, X } from 'lucide-react'
 import { aiApi } from '@/lib/api'
 
@@ -14,6 +14,9 @@ export default function WidgetPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUnauthorized, setIsUnauthorized] = useState(false)
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([])
+  const [isDropActive, setIsDropActive] = useState(false)
+  const [isDraggingWidget, setIsDraggingWidget] = useState(false)
+  const [isDragAnimating, setIsDragAnimating] = useState(false)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -21,6 +24,10 @@ export default function WidgetPage() {
   const animationRef = useRef<number | null>(null)
   const recognitionRef = useRef<any>(null)
   const endTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null)
+  const dragBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
+  const dragMovedRef = useRef(false)
+  const dragRafRef = useRef<number | null>(null)
 
   const logToDebug = (message: string, data?: any) => {
     try {
@@ -144,7 +151,7 @@ export default function WidgetPage() {
     }
   }
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     logToDebug('stopRecording called')
     if (recognitionRef.current) {
       recognitionRef.current.stop()
@@ -156,7 +163,7 @@ export default function WidgetPage() {
       audioContextRef.current.close()
     }
     setIsRecording(false)
-  }
+  }, [])
 
   const playTTS = async (text: string): Promise<void> => {
     logToDebug('playTTS starting for:', text)
@@ -216,8 +223,8 @@ export default function WidgetPage() {
     })
   }
 
-  const handleClose = async (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleClose = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
     setIsExpanded(false)
     stopRecording()
     setTranscript('')
@@ -240,11 +247,8 @@ export default function WidgetPage() {
       await desktopResizeWidget(true);
       logToDebug('desktopResizeWidget(true) done');
 
-      // 2. Play greeting and WAIT for it to finish
-      await playTTS('Привет');
-      
-      // 3. Start recording ONLY after greeting
-      startRecording();
+  // 2. Start recording immediately (no greeting)
+  startRecording();
       
     } catch (err) {
       logToDebug('handleExpand error:', err);
@@ -298,12 +302,90 @@ export default function WidgetPage() {
         if (!isExpanded) {
           handleExpand()
         } else {
-          handleClose({ stopPropagation: () => {} } as React.MouseEvent)
+          handleClose()
         }
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded])
+
+  useEffect(() => {
+    onDesktopHideWidget(() => {
+      void handleClose()
+    })
+  }, [])
+
+  const handleWidgetPointerDown = useCallback(async (e: React.PointerEvent) => {
+    if (isExpanded || e.button !== 0) return
+    const bounds = await desktopGetWidgetBounds()
+    if (!bounds) return
+
+    dragStartRef.current = { x: e.screenX, y: e.screenY }
+    dragBoundsRef.current = bounds
+    dragMovedRef.current = false
+    setIsDraggingWidget(true)
+    setIsDragAnimating(true)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [isExpanded])
+
+  const handleWidgetPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingWidget || !dragStartRef.current || !dragBoundsRef.current) return
+    const dx = e.screenX - dragStartRef.current.x
+    const dy = e.screenY - dragStartRef.current.y
+    if (Math.abs(dx) + Math.abs(dy) > 4) {
+      dragMovedRef.current = true
+    }
+
+    const nextBounds = {
+      ...dragBoundsRef.current,
+      x: dragBoundsRef.current.x + dx,
+      y: dragBoundsRef.current.y + dy,
+    }
+
+    if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current)
+    dragRafRef.current = requestAnimationFrame(() => {
+      void desktopSetWidgetBounds(nextBounds)
+    })
+  }, [isDraggingWidget])
+
+  const handleWidgetPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingWidget) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    setIsDraggingWidget(false)
+    dragStartRef.current = null
+    dragBoundsRef.current = null
+    if (dragRafRef.current) {
+      cancelAnimationFrame(dragRafRef.current)
+      dragRafRef.current = null
+    }
+    // Keep animation state for smooth transition back
+    setTimeout(() => setIsDragAnimating(false), 200)
+  }, [isDraggingWidget])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    if (!isDropActive) setIsDropActive(true)
+  }, [isDropActive])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDropActive(false)
+  }, [])
+
+  const handleFileDrop = useCallback(async (file: File) => {
+    const message = `Файл «${file.name}» получен. Что с ним сделать?`
+    setResponse(message)
+    await playTTS(message)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDropActive(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      void handleFileDrop(file)
+    }
+  }, [handleFileDrop])
 
   const drawVisualizer = () => {
     if (!analyserRef.current || !canvasRef.current) return
@@ -358,17 +440,33 @@ export default function WidgetPage() {
 
   return (
     <div 
-      className={`flex h-full w-full justify-end overflow-hidden ${isExpanded ? 'p-2' : 'p-0'}`}
+      className={`relative flex h-full w-full justify-end overflow-hidden ${isExpanded ? 'p-2' : 'p-0'}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      {isDropActive && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl border border-white/20 bg-black/40 text-sm font-medium text-white backdrop-blur">
+          Отпустите файл, чтобы отправить его ассистенту
+        </div>
+      )}
       <div 
         onClick={(e) => {
           if (!isExpanded) {
+            if (dragMovedRef.current) {
+              dragMovedRef.current = false
+              return
+            }
             e.preventDefault();
             e.stopPropagation();
             logToDebug('Outer div clicked');
             handleExpand();
           }
         }}
+        onPointerDown={handleWidgetPointerDown}
+        onPointerMove={handleWidgetPointerMove}
+        onPointerUp={handleWidgetPointerUp}
+        onPointerCancel={handleWidgetPointerUp}
         className={`group relative flex items-center backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
           isExpanded 
             ? 'w-[400px] h-20 rounded-[2rem] bg-[#0a0a0c]/90 border border-white/10 shadow-2xl shadow-blue/20 p-1.5' 

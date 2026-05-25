@@ -69,9 +69,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-lime">
+          <Link href="/space" className="flex h-8 w-8 items-center justify-center rounded-lg bg-lime">
             <FileText className="h-4 w-4 text-black" />
-          </div>
+          </Link>
           <span className="font-semibold text-sidebar-foreground">ОКАК</span>
         </div>
       </SidebarHeader>

@@ -82,11 +82,18 @@ const api = {
   toggleOverlay: () => ipcRenderer.invoke('app:toggle-overlay'),
   isOverlayVisible: () => ipcRenderer.invoke('app:is-overlay-visible'),
   resizeWidget: (expanded: boolean) => ipcRenderer.invoke('app:resize-widget', expanded),
+  getWidgetBounds: () => ipcRenderer.invoke('app:get-widget-bounds'),
+  setWidgetBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+    ipcRenderer.invoke('app:set-widget-bounds', bounds),
   writeLog: (message: string) => ipcRenderer.send('app:write-log', message),
   onToggleWidgetExpand: (callback: () => void) => {
     ipcRenderer.removeAllListeners('app:toggle-widget-expand')
     ipcRenderer.on('app:toggle-widget-expand', () => callback())
-  }
+  },
+  onHideWidget: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('app:hide-widget')
+    ipcRenderer.on('app:hide-widget', () => callback())
+  },
 }
 
 contextBridge.exposeInMainWorld('electron', api)

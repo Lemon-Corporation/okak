@@ -304,6 +304,23 @@ function createWindow(): void {
   })
 }
 
+type WidgetBounds = { x: number; y: number; width: number; height: number }
+
+function clampWidgetBounds(bounds: WidgetBounds): WidgetBounds {
+  const display = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y })
+  const { x: areaX, y: areaY, width: areaWidth, height: areaHeight } = display.workArea
+  const maxX = areaX + areaWidth - bounds.width
+  const maxY = areaY + areaHeight - bounds.height
+  const limitX = Math.max(areaX, maxX)
+  const limitY = Math.max(areaY, maxY)
+
+  return {
+    ...bounds,
+    x: Math.min(Math.max(bounds.x, areaX), limitX),
+    y: Math.min(Math.max(bounds.y, areaY), limitY),
+  }
+}
+
 function createWidgetWindow(): void {
   log.info('[widget] creating widget window')
   const size = 100
@@ -846,6 +863,7 @@ ipcMain.handle('app:show-overlay', () => {
 ipcMain.handle('app:hide-overlay', () => {
   if (widgetWindow) {
     widgetWindow.webContents.send('app:hide-widget')
+    widgetWindow.hide()
   }
 })
 
@@ -859,16 +877,27 @@ ipcMain.handle('app:is-overlay-visible', () => {
 
 ipcMain.handle('app:resize-widget', (_event, expanded: boolean) => {
   if (widgetWindow) {
-    const margin = 20
-    const primaryDisplay = screen.getPrimaryDisplay()
-    const { width: screenWidth } = primaryDisplay.workAreaSize
-    
-    if (expanded) {
-      widgetWindow.setBounds({ width: 450, height: 120, x: screenWidth - 450 - margin, y: margin })
-    } else {
-      widgetWindow.setBounds({ width: 100, height: 100, x: screenWidth - 100 - margin, y: margin })
-    }
+    const current = widgetWindow.getBounds()
+    const next = clampWidgetBounds({
+      x: current.x,
+      y: current.y,
+      width: expanded ? 450 : 100,
+      height: expanded ? 120 : 100,
+    })
+    widgetWindow.setBounds(next)
   }
+})
+
+ipcMain.handle('app:get-widget-bounds', () => {
+  if (!widgetWindow) return null
+  return widgetWindow.getBounds()
+})
+
+ipcMain.handle('app:set-widget-bounds', (_event, bounds: WidgetBounds) => {
+  if (!widgetWindow) return null
+  const next = clampWidgetBounds(bounds)
+  widgetWindow.setBounds(next)
+  return next
 })
 
   ipcMain.on('app:write-log', (_event, message: string) => {
@@ -1048,6 +1077,18 @@ app.on('ready', () => {
     toggleOverlay()
   })
   log.info('[shortcut] overlay shortcut registered:', overlayShortcut)
+
+  const widgetToggleShortcut = globalShortcut.register('CommandOrControl+Shift+H', () => {
+    if (!widgetWindow) return
+    if (widgetWindow.isVisible()) {
+      widgetWindow.webContents.send('app:hide-widget')
+      widgetWindow.hide()
+    } else {
+      widgetWindow.show()
+      widgetWindow.focus()
+    }
+  })
+  log.info('[shortcut] widget toggle shortcut registered:', widgetToggleShortcut)
 
   const shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+O', () => {
     if (mainWindow) {

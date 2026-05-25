@@ -58,6 +58,9 @@ export interface ElectronAPI {
   hideOverlay(): Promise<void>
   toggleOverlay(): Promise<void>
   isOverlayVisible(): Promise<boolean>
+  getWidgetBounds(): Promise<{ x: number; y: number; width: number; height: number } | null>
+  setWidgetBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<{ x: number; y: number; width: number; height: number } | null>
+  onHideWidget(callback: () => void): void
 }
 
 declare global {
