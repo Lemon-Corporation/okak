@@ -64,6 +64,8 @@ export interface ElectronAPI {
   writeLog(message: string): void
   onToggleWidgetExpand(callback: () => void): void
   onHideWidget(callback: () => void): void
+  broadcast(channel: string, data: any): void
+  onBroadcast(channel: string, callback: (data: any) => void): void
 }
 
 declare global {
@@ -364,4 +366,14 @@ export function desktopWriteLog(message: string): void {
 export function onDesktopHideWidget(callback: () => void): void {
   if (!isElectron()) return
   window.electron!.onHideWidget(callback)
+}
+
+export function desktopBroadcast(channel: string, data: any): void {
+  if (!isElectron()) return
+  window.electron!.broadcast(channel, data)
+}
+
+export function onDesktopBroadcast(channel: string, callback: (data: any) => void): void {
+  if (!isElectron()) return
+  window.electron!.onBroadcast(channel, callback)
 }

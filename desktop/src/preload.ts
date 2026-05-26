@@ -94,6 +94,10 @@ const api = {
     ipcRenderer.removeAllListeners('app:hide-widget')
     ipcRenderer.on('app:hide-widget', () => callback())
   },
+  broadcast: (channel: string, data: any) => ipcRenderer.send('app:broadcast', channel, data),
+  onBroadcast: (channel: string, callback: (data: any) => void) => {
+    ipcRenderer.on(channel, (_event, data) => callback(data))
+  },
 }
 
 contextBridge.exposeInMainWorld('electron', api)

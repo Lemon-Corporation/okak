@@ -24,6 +24,10 @@ import {
   ShieldCheck,
   Clock3,
   X,
+  Download,
+  Apple,
+  Monitor,
+  Box,
 } from 'lucide-react'
 
 const demoViews = ['capture', 'board', 'search'] as const
@@ -381,6 +385,70 @@ function Brand() {
   )
 }
 
+function DownloadButton() {
+  const [os, setOs] = useState<'macos' | 'windows' | 'linux' | 'other'>('other')
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+  const [version, setVersion] = useState<string>('')
+
+  useEffect(() => {
+    const platform = window.navigator.platform.toLowerCase()
+    if (platform.includes('mac')) setOs('macos')
+    else if (platform.includes('win')) setOs('windows')
+    else if (platform.includes('linux')) setOs('linux')
+
+    // Fetch latest release from GitHub
+    fetch('https://api.github.com/repos/Lemon-Corporation/okak-release/releases/latest')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.assets) {
+          setVersion(data.tag_name)
+          const currentOs = platform.includes('mac') ? 'macos' : platform.includes('win') ? 'windows' : platform.includes('linux') ? 'linux' : 'other'
+          
+          let asset;
+          if (currentOs === 'macos') {
+            asset = data.assets.find((a: any) => a.name.endsWith('.dmg'))
+          } else if (currentOs === 'windows') {
+            asset = data.assets.find((a: any) => a.name.endsWith('.exe'))
+          } else if (currentOs === 'linux') {
+            asset = data.assets.find((a: any) => a.name.endsWith('.AppImage'))
+          }
+          
+          if (asset) setDownloadUrl(asset.browser_download_url)
+        }
+      })
+      .catch(console.error)
+  }, [])
+
+  const osInfo = {
+    macos: { label: 'macOS', icon: Apple },
+    windows: { label: 'Windows', icon: Monitor },
+    linux: { label: 'Linux', icon: Box },
+    other: { label: 'Приложение', icon: Download },
+  }
+
+  const current = osInfo[os]
+  const Icon = current.icon
+
+  return (
+    <Button
+      size="lg"
+      variant="outline"
+      className="liquid-glass h-12 rounded-2xl border-0 px-6 text-base font-bold transition hover:-translate-y-0.5"
+      onClick={() => {
+        if (downloadUrl) {
+          window.location.href = downloadUrl
+        } else {
+          window.open('https://github.com/Lemon-Corporation/okak-release/releases', '_blank')
+        }
+      }}
+    >
+      <Icon className="mr-2 h-4 w-4" />
+      Скачать для {current.label}
+      {version && <span className="ml-2 opacity-50 text-xs">{version}</span>}
+    </Button>
+  )
+}
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-hidden bg-background text-foreground">
@@ -453,14 +521,7 @@ export default function LandingPage() {
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  asChild
-                  className="liquid-glass h-12 rounded-2xl border-0 px-6 text-base font-bold transition hover:-translate-y-0.5"
-                >
-                  <Link href="/login">Открыть демо</Link>
-                </Button>
+                <DownloadButton />
               </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-3 text-sm font-medium text-muted-foreground">

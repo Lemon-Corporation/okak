@@ -1,7 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +18,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
+import { onDesktopBroadcast } from '@/lib/electron'
 import {
   FileText,
   Home,
@@ -60,10 +62,30 @@ const mainNavItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const user = useAppStore((state) => state.user)
   const logout = useAppStore((state) => state.logout)
   const projects = useAppStore((state) => state.projects)
   const setOverlayOpen = useAppStore((state) => state.setOverlayOpen)
+
+  const loadProjects = useAppStore((state) => state.loadProjects)
+  const loadNotes = useAppStore((state) => state.loadNotes)
+  const loadTasks = useAppStore((state) => state.loadTasks)
+
+  // Listen for data sync and navigation from other windows
+  useEffect(() => {
+    onDesktopBroadcast('app:sync-data', () => {
+      console.log('[Sidebar] syncing data...')
+      loadProjects()
+      loadNotes()
+      loadTasks()
+    })
+
+    onDesktopBroadcast('app:navigate', (url: string) => {
+      console.log('[Sidebar] navigating to:', url)
+      router.push(url)
+    })
+  }, [loadProjects, loadNotes, loadTasks, router])
 
   return (
     <Sidebar>

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { desktopGetWidgetBounds, desktopResizeWidget, desktopSetWidgetBounds, desktopWriteLog, onDesktopHideWidget } from '@/lib/electron'
-import { Bot, Mic, BrainCircuit, AudioLines, Moon, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { desktopGetWidgetBounds, desktopHideOverlay, desktopResizeWidget, desktopSetWidgetBounds, desktopWriteLog, onDesktopHideWidget, desktopBroadcast, onDesktopBroadcast } from '@/lib/electron'
+import { Bot, Mic, BrainCircuit, AudioLines, Moon, X, StickyNote, CheckSquare, FolderKanban, Sparkles } from 'lucide-react'
 import { aiApi } from '@/lib/api'
 
 export default function WidgetPage() {
@@ -17,6 +18,7 @@ export default function WidgetPage() {
   const [isDropActive, setIsDropActive] = useState(false)
   const [isDraggingWidget, setIsDraggingWidget] = useState(false)
   const [isDragAnimating, setIsDragAnimating] = useState(false)
+  const [activeAction, setActiveAction] = useState<'note' | 'task' | 'project' | null>(null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -24,6 +26,7 @@ export default function WidgetPage() {
   const animationRef = useRef<number | null>(null)
   const recognitionRef = useRef<any>(null)
   const endTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
   const dragBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const dragMovedRef = useRef(false)
@@ -38,6 +41,23 @@ export default function WidgetPage() {
       console.error('Logging failed', err);
     }
   };
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current)
+    }
+    inactivityTimeoutRef.current = setTimeout(() => {
+      logToDebug('Inactivity timeout reached, collapsing widget')
+      handleClose()
+    }, 10000) // 10 seconds of silence/inactivity to collapse
+  }, [])
+
+  const stopInactivityTimer = useCallback(() => {
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current)
+      inactivityTimeoutRef.current = null
+    }
+  }, [])
 
   const startRecording = async () => {
     logToDebug('startRecording starting...')
@@ -227,6 +247,7 @@ export default function WidgetPage() {
     e?.stopPropagation()
     setIsExpanded(false)
     stopRecording()
+    stopInactivityTimer()
     setTranscript('')
     setResponse('')
     setMessages([]) // clear context on close
@@ -247,8 +268,11 @@ export default function WidgetPage() {
       await desktopResizeWidget(true);
       logToDebug('desktopResizeWidget(true) done');
 
-  // 2. Start recording immediately (no greeting)
-  startRecording();
+      // 2. Reset and start inactivity timer
+      resetInactivityTimer();
+      
+      // 3. Start recording immediately (no greeting)
+      startRecording();
       
     } catch (err) {
       logToDebug('handleExpand error:', err);
@@ -258,6 +282,7 @@ export default function WidgetPage() {
   const handleSendToAI = async (text: string) => {
     logToDebug('Sending to AI:', text)
     setIsThinking(true)
+    stopInactivityTimer() // Stop timer while AI is processing
     
     // Add user message to local state immediately
     const userMessage = { role: 'user' as const, content: text };
@@ -267,12 +292,47 @@ export default function WidgetPage() {
     try {
       const res = await aiApi.chat(currentMessages)
       logToDebug('AI Response received:', res)
+      
+      // Detect action from response content
+      const lowerRes = res.content.toLowerCase()
+      if (lowerRes.includes('заметк')) {
+        setActiveAction('note')
+        desktopBroadcast('app:sync-data', { type: 'note' })
+        setTimeout(() => setActiveAction(null), 2500)
+      } else if (lowerRes.includes('задач')) {
+        setActiveAction('task')
+        desktopBroadcast('app:sync-data', { type: 'task' })
+        setTimeout(() => setActiveAction(null), 2500)
+      } else if (lowerRes.includes('проект')) {
+        setActiveAction('project')
+        desktopBroadcast('app:sync-data', { type: 'project' })
+        setTimeout(() => setActiveAction(null), 2500)
+      }
+
+      // Detection for navigation
+      if (lowerRes.includes('откр') || lowerRes.includes('перей')) {
+        if (lowerRes.includes('заметк')) desktopBroadcast('app:navigate', '/notes')
+        else if (lowerRes.includes('задач')) desktopBroadcast('app:navigate', '/tasks')
+        else if (lowerRes.includes('проект')) desktopBroadcast('app:navigate', '/projects')
+        else if (lowerRes.includes('файл')) desktopBroadcast('app:navigate', '/files')
+        else if (lowerRes.includes('настрой')) desktopBroadcast('app:navigate', '/settings')
+        else if (lowerRes.includes('главн') || lowerRes.includes('простран')) desktopBroadcast('app:navigate', '/space')
+      }
+
       setResponse(res.content)
       
       // Add assistant response to local state
       setMessages([...currentMessages, { role: 'assistant', content: res.content }]);
       
       await playTTS(res.content)
+      
+      // After AI finishes speaking, check if we should continue listening
+      if (isExpanded) {
+        logToDebug('AI finished speaking, starting to listen again')
+        setTranscript('')
+        startRecording()
+        resetInactivityTimer() // Restart inactivity timer after AI finishes
+      }
     } catch (err: any) {
       logToDebug('handleSendToAI error:', err)
       if (err.status === 401) {
@@ -281,6 +341,7 @@ export default function WidgetPage() {
         await playTTS('Пожалуйста, авторизуйтесь в приложении')
       } else {
         setResponse('Произошла ошибка')
+        resetInactivityTimer()
       }
     } finally {
       setIsThinking(false)
@@ -313,10 +374,23 @@ export default function WidgetPage() {
     onDesktopHideWidget(() => {
       void handleClose()
     })
+
+    // Listen for auth changes from main window
+    onDesktopBroadcast('app:auth-changed', (data: { status: string }) => {
+      logToDebug('Auth status changed:', data.status)
+      if (data.status === 'logged_out') {
+        setIsUnauthorized(true)
+        setResponse('Вы вышли из аккаунта')
+        setMessages([])
+      } else if (data.status === 'logged_in') {
+        setIsUnauthorized(false)
+        setResponse('')
+      }
+    })
   }, [])
 
   const handleWidgetPointerDown = useCallback(async (e: React.PointerEvent) => {
-    if (isExpanded || e.button !== 0) return
+    if (e.button !== 0) return
     const bounds = await desktopGetWidgetBounds()
     if (!bounds) return
 
@@ -326,7 +400,7 @@ export default function WidgetPage() {
     setIsDraggingWidget(true)
     setIsDragAnimating(true)
     e.currentTarget.setPointerCapture(e.pointerId)
-  }, [isExpanded])
+  }, [])
 
   const handleWidgetPointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDraggingWidget || !dragStartRef.current || !dragBoundsRef.current) return
@@ -361,6 +435,24 @@ export default function WidgetPage() {
     // Keep animation state for smooth transition back
     setTimeout(() => setIsDragAnimating(false), 200)
   }, [isDraggingWidget])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isExpanded) {
+        e.preventDefault()
+        void handleClose()
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault()
+        void desktopHideOverlay()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isExpanded])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -463,17 +555,13 @@ export default function WidgetPage() {
             handleExpand();
           }
         }}
-        onPointerDown={handleWidgetPointerDown}
-        onPointerMove={handleWidgetPointerMove}
-        onPointerUp={handleWidgetPointerUp}
-        onPointerCancel={handleWidgetPointerUp}
         className={`group relative flex items-center backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
           isExpanded 
             ? 'w-[400px] h-20 rounded-[2rem] bg-[#0a0a0c]/90 border border-white/10 shadow-2xl shadow-blue/20 p-1.5' 
             : 'w-14 h-14 rounded-full bg-transparent hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-blue/20'
         }`}
         style={{ 
-          WebkitAppRegion: isExpanded ? 'drag' : 'none',
+          WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}
       >
         <div 
@@ -484,9 +572,13 @@ export default function WidgetPage() {
             logToDebug('Inner circle clicked');
             handleExpand();
           }}
+          onPointerDown={handleWidgetPointerDown}
+          onPointerMove={handleWidgetPointerMove}
+          onPointerUp={handleWidgetPointerUp}
+          onPointerCancel={handleWidgetPointerUp}
           className={`relative flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-500 z-20 overflow-hidden ${
             isExpanded ? 'w-16 h-16 mr-3 -ml-0.5' : 'w-full h-full'
-          }`}
+          } ${isDragAnimating ? 'scale-110 shadow-[0_0_24px_rgba(59,130,246,0.35)]' : ''}`}
           style={{
             transform: 'translateZ(0)',
             WebkitMaskImage: '-webkit-radial-gradient(white, black)',
@@ -533,6 +625,48 @@ export default function WidgetPage() {
               <Bot className="w-5 h-5" />
             )}
           </div>
+
+          {/* Flying Action Visualization */}
+          <AnimatePresence>
+            {activeAction && (
+              <>
+                <motion.div
+                  initial={{ scale: 0, x: 0, y: 0, opacity: 0 }}
+                  animate={{ 
+                    scale: [0, 1.2, 1, 0.8], 
+                    x: 280, 
+                    y: -10, 
+                    opacity: [0, 1, 1, 0],
+                    rotate: [0, 15, -15, 45]
+                  }}
+                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                  className="absolute z-50 text-lime pointer-events-none"
+                >
+                  {activeAction === 'note' && <StickyNote className="w-6 h-6 drop-shadow-[0_0_8px_rgba(163,230,53,0.8)]" />}
+                  {activeAction === 'task' && <CheckSquare className="w-6 h-6 drop-shadow-[0_0_8px_rgba(163,230,53,0.8)]" />}
+                  {activeAction === 'project' && <FolderKanban className="w-6 h-6 drop-shadow-[0_0_8px_rgba(163,230,53,0.8)]" />}
+                </motion.div>
+                
+                {/* Sparkles trailing effect */}
+                {[...Array(5)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ scale: 0, x: 0, y: 0, opacity: 0 }}
+                    animate={{ 
+                      scale: [0, 1, 0],
+                      x: 200 + (i * 20),
+                      y: -5 + (Math.sin(i) * 10),
+                      opacity: [0, 0.8, 0]
+                    }}
+                    transition={{ duration: 0.8, delay: 0.2 + (i * 0.1) }}
+                    className="absolute z-40 text-blue-300 pointer-events-none"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                  </motion.div>
+                ))}
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
         <div 

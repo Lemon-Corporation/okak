@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
+import { aiApi } from '@/lib/api'
 import {
   ArrowUp,
   Sparkles,
@@ -56,6 +58,10 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  const loadProjects = useAppStore((state) => state.loadProjects)
+  const loadNotes = useAppStore((state) => state.loadNotes)
+  const loadTasks = useAppStore((state) => state.loadTasks)
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -77,12 +83,41 @@ export default function ChatPage() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setLoading(true)
 
-    await new Promise((r) => setTimeout(r, 820))
+    try {
+      // Create chat history for the AI
+      const chatHistory = messages.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.text
+      }))
 
-    const reply = getReply(trimmed)
-    const assistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', text: reply }
-    setMessages((prev) => [...prev, assistantMsg])
-    setLoading(false)
+      const response = await aiApi.chat([
+        ...chatHistory,
+        { role: 'user', content: trimmed }
+      ])
+
+      const assistantMsg: Message = { 
+        id: crypto.randomUUID(), 
+        role: 'assistant', 
+        text: response.content 
+      }
+      setMessages((prev) => [...prev, assistantMsg])
+
+      // If the AI says it created something, reload data
+      if (response.content.includes('создал') || response.content.includes('успешно')) {
+        loadProjects()
+        loadNotes()
+        loadTasks()
+      }
+    } catch (err) {
+      const errorMsg: Message = { 
+        id: crypto.randomUUID(), 
+        role: 'assistant', 
+        text: 'Извините, произошла ошибка при общении с ИИ. Проверьте подключение.' 
+      }
+      setMessages((prev) => [...prev, errorMsg])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const isEmpty = messages.length === 0

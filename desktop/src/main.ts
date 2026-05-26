@@ -625,6 +625,13 @@ ipcMain.handle('app:minimize', () => {
   if (mainWindow) mainWindow.minimize()
 })
 
+// Broadcast message to all windows
+ipcMain.on('app:broadcast', (_event, channel: string, data: any) => {
+  log.info(`[ipc] broadcasting to ${channel}:`, data)
+  mainWindow?.webContents.send(channel, data)
+  widgetWindow?.webContents.send(channel, data)
+})
+
 ipcMain.handle('app:maximize', () => {
   if (mainWindow) {
     if (mainWindow.isMaximized()) {

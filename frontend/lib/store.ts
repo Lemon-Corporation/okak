@@ -18,6 +18,7 @@ import { now } from './utils'
 import { authApi, projectsApi, notesApi, tasksApi, filesApi } from './api'
 import type { BackendProject, BackendNote, BackendTask } from './api/dto'
 import { PROJECT_COLORS } from './utils'
+import { desktopBroadcast } from './electron'
 
 // --- mappers ---
 
@@ -101,6 +102,7 @@ interface AppStore {
   isLoading: boolean
   loading: { projects: boolean; notes: boolean; tasks: boolean; files: boolean }
   errors: { projects: string | null; notes: string | null; tasks: string | null; files: string | null }
+  contextCapture: { type: 'file'; fileId: string } | { type: 'text'; text: string } | null
 
   // Auth actions
   loadUser: () => Promise<void>
@@ -118,6 +120,8 @@ interface AppStore {
   // Overlay actions
   toggleOverlay: () => void
   setOverlayOpen: (open: boolean) => void
+  openContextCapture: (payload: { type: 'file'; fileId: string } | { type: 'text'; text: string }) => void
+  closeContextCapture: () => void
 
   // Sidebar actions
   toggleSidebar: () => void
@@ -146,6 +150,7 @@ interface AppStore {
 
   // Files CRUD
   createFile: (file: File, projectId: string) => Promise<FileItem>
+  attachFileToProject: (fileId: string, projectId: string) => Promise<void>
   deleteFile: (id: string) => Promise<void>
   getFileById: (id: string) => FileItem | undefined
   getFilesByProject: (projectId: string | null) => FileItem[]
@@ -162,6 +167,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   isLoading: false,
   loading: { projects: false, notes: false, tasks: false, files: false },
   errors: { projects: null, notes: null, tasks: null, files: null },
+  contextCapture: null,
 
   // --- Auth ---
 
@@ -198,6 +204,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     }
 
     set({ user })
+    desktopBroadcast('app:auth-changed', { status: 'logged_in', user })
   },
 
   register: async (email, password, name) => {
@@ -215,6 +222,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     }
 
     set({ user })
+    desktopBroadcast('app:auth-changed', { status: 'logged_in', user })
   },
 
   logout: async () => {
@@ -225,6 +233,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     localStorage.removeItem('okak_access_token')
 
     set({ user: null, notes: [], tasks: [], projects: [], files: [] })
+    desktopBroadcast('app:auth-changed', { status: 'logged_out' })
   },
 
   updateUser: (updates) => {
@@ -369,6 +378,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
   toggleOverlay: () => set((s) => ({ isOverlayOpen: !s.isOverlayOpen })),
   setOverlayOpen: (open) => set({ isOverlayOpen: open }),
+  openContextCapture: (payload) => set({ contextCapture: payload }),
+  closeContextCapture: () => set({ contextCapture: null }),
 
   // --- Sidebar ---
 
@@ -577,6 +588,16 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set((s) => ({ files: [fileItem, ...s.files] }))
 
     return fileItem
+  },
+
+  attachFileToProject: async (fileId, projectId) => {
+    set((s) => ({
+      files: s.files.map((f) => (f.id === fileId ? { ...f, projectId, updatedAt: now() } : f)),
+    }))
+
+    try {
+      await projectsApi.attachFile(projectId, fileId)
+    } catch {}
   },
 
   deleteFile: async (id) => {

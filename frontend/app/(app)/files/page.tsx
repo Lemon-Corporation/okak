@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +59,7 @@ export default function FilesPage() {
   const projects = useAppStore((state) => state.projects)
   const createFile = useAppStore((state) => state.createFile)
   const deleteFile = useAppStore((state) => state.deleteFile)
+  const openContextCapture = useAppStore((state) => state.openContextCapture)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterProject, setFilterProject] = useState<string>('all')
@@ -66,6 +67,7 @@ export default function FilesPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
 
   const filteredFiles = files.filter((file) => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -137,6 +139,20 @@ export default function FilesPage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return
+      if (event.key.toLowerCase() !== 'f') return
+      if (!selectedFileId) return
+
+      event.preventDefault()
+      openContextCapture({ type: 'file', fileId: selectedFileId })
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [openContextCapture, selectedFileId])
+
   const renderFileCard = (file: typeof files[0]) => {
     const iconType = getFileIcon(file.type)
     const IconComponent = iconMap[iconType] || FileIcon
@@ -147,7 +163,11 @@ export default function FilesPage() {
       return (
         <div
           key={file.id}
-          className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
+          onClick={() => setSelectedFileId(file.id)}
+          className={cn(
+            'group flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50',
+            selectedFileId === file.id && 'border-blue-500/60 bg-blue/5'
+          )}
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
             <IconComponent className="h-5 w-5 text-muted-foreground" />
@@ -200,7 +220,14 @@ export default function FilesPage() {
     }
 
     return (
-      <Card key={file.id} className="group relative transition-shadow hover:border-blue-600">
+      <Card
+        key={file.id}
+        onClick={() => setSelectedFileId(file.id)}
+        className={cn(
+          'group relative transition-shadow hover:border-blue-600',
+          selectedFileId === file.id && 'border-blue-500/60 ring-1 ring-blue-400/40'
+        )}
+      >
         <CardContent className="p-4">
           <div className="mb-3 flex h-24 items-center justify-center rounded-lg bg-muted">
             {file.type.startsWith('image/') ? (

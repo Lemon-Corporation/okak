@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { useAppStore } from '@/lib/store'
 import { authApi } from '@/lib/api'
-import { User, CreditCard, Bell, Shield, Trash2 } from 'lucide-react'
+import { User, CreditCard, Bell, Shield, Trash2, Info, RefreshCw } from 'lucide-react'
+import { useElectron } from '@/hooks/use-electron'
 
 export default function SettingsPage() {
   const user = useAppStore((state) => state.user)
@@ -27,6 +28,9 @@ export default function SettingsPage() {
     pro: 'Pro',
     team: 'Team',
   }
+
+  const { isElectron } = useElectron()
+  const [appVersion, setAppVersion] = useState('0.1.0')
 
   return (
     <div className="flex flex-col">
@@ -192,6 +196,35 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* App Info (Desktop Only) */}
+            {isElectron && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Info className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <CardTitle className="text-base">О приложении</CardTitle>
+                      <CardDescription>Информация о версии и обновлениях</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Версия {appVersion}</p>
+                      <p className="text-sm text-muted-foreground">
+                        У вас установлена последняя версия
+                      </p>
+                    </div>
+                    <Button variant="outline" className="gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      Проверить обновления
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Danger Zone */}
             <Card className="border-destructive">
