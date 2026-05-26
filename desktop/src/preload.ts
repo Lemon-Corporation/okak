@@ -94,6 +94,8 @@ const api = {
     ipcRenderer.removeAllListeners('app:hide-widget')
     ipcRenderer.on('app:hide-widget', () => callback())
   },
+  centerWidget: () => ipcRenderer.invoke('app:center-widget'),
+  completeOnboarding: () => ipcRenderer.invoke('app:complete-onboarding'),
   broadcast: (channel: string, data: any) => ipcRenderer.send('app:broadcast', channel, data),
   onBroadcast: (channel: string, callback: (data: any) => void) => {
     ipcRenderer.on(channel, (_event, data) => callback(data))

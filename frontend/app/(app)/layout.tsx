@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
 import { Overlay } from '@/components/overlay'
 import { ContextCaptureDialog } from '@/components/context-capture-dialog'
+import { HighlightOverlay } from '@/components/highlight-overlay'
 import { useAppStore } from '@/lib/store'
 
 export default function AppLayout({
@@ -81,6 +82,7 @@ export default function AppLayout({
       </SidebarInset>
       <Overlay />
       <ContextCaptureDialog />
+      <HighlightOverlay />
     </SidebarProvider>
   )
 }

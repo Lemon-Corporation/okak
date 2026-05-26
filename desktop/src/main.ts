@@ -895,6 +895,46 @@ ipcMain.handle('app:resize-widget', (_event, expanded: boolean) => {
   }
 })
 
+ipcMain.handle('app:center-widget', () => {
+  if (widgetWindow) {
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const { width, height } = primaryDisplay.workAreaSize
+    const w = 450
+    const h = 160
+    widgetWindow.setBounds({
+      x: Math.floor((width - w) / 2),
+      y: Math.floor((height - h) / 2),
+      width: w,
+      height: h,
+    })
+    widgetWindow.show()
+    widgetWindow.focus()
+  }
+})
+
+ipcMain.handle('app:complete-onboarding', () => {
+  log.info('[app] onboarding completed')
+  ;(windowStore as any).set('onboarding-completed', true)
+  if (!mainWindow) {
+    createWindow()
+  }
+  mainWindow?.show()
+  mainWindow?.focus()
+  // Move widget to corner
+  if (widgetWindow) {
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const { width: screenWidth } = primaryDisplay.workAreaSize
+    const size = 100
+    const margin = 20
+    widgetWindow.setBounds({
+      x: screenWidth - size - margin,
+      y: margin,
+      width: size,
+      height: size
+    })
+  }
+})
+
 ipcMain.handle('app:get-widget-bounds', () => {
   if (!widgetWindow) return null
   return widgetWindow.getBounds()
@@ -1047,8 +1087,21 @@ app.on('open-url', (event, url) => {
 
 app.on('ready', () => {
   log.info('App starting... version:', app.getVersion())
-  createWindow()
-  createWidgetWindow()
+  
+  const isOnboardingCompleted = (windowStore as any).get('onboarding-completed') === true
+  
+  if (!isOnboardingCompleted) {
+    log.info('[app] starting with onboarding')
+    createWidgetWindow()
+    // Wait for widget to load before centering
+    setTimeout(() => {
+      ipcMain.emit('app:center-widget')
+    }, 1000)
+  } else {
+    createWindow()
+    createWidgetWindow()
+  }
+  
   createTray()
   Menu.setApplicationMenu(buildMenu())
   startConnectivityCheck()

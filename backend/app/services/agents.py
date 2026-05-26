@@ -10,7 +10,7 @@ from app.repository.ai_context import (
     ProjectAIContextRecord,
     ProjectAISummaryRecord,
 )
-from app.schemas.ai import AISource, AIUsedProject, ChatRequest, ChatResponse
+from app.schemas.ai import AISource, AIUsedProject, ChatRequest, ChatResponse, AIAction
 from app.services.llm import LLMClient
 from app.services.notes import NoteService
 from app.schemas.notes import CreateNoteCommand
@@ -189,8 +189,9 @@ class AIAgentService:
 
         function_call = self._extract_function_call(first_response)
         
-        # 1. Сначала проверяем, нет ли кастомной текстовой команды [CREATE_NOTE: ...]
+        # Parse commands and populate actions
         content = (first_response.get("content") or "").strip()
+        actions: list[AIAction] = []
         
         # 1. Заметка
         create_note_match = re.search(r'\[CREATE_NOTE:\s*project_id="([^"]+)",\s*title="([^"]+)",\s*content="([^"]+)"\]', content)
@@ -208,17 +209,10 @@ class AIAgentService:
                         status=NoteStatus.DRAFT
                     )
                 )
-                return ChatResponse(
-                    role="assistant",
-                    content=f"Я успешно создал заметку «{title}»!",
-                    conversation_id=request.conversation_id,
-                )
+                actions.append(AIAction(type="create_note", payload={"title": title, "project_id": str(p_id)}))
+                content = f"Я успешно создал заметку «{title}»!"
             except Exception as e:
-                return ChatResponse(
-                    role="assistant",
-                    content=f"Не удалось создать заметку: {e}",
-                    conversation_id=request.conversation_id,
-                )
+                content = f"Не удалось создать заметку: {e}"
                 
         # 2. Проект
         create_project_match = re.search(r'\[CREATE_PROJECT:\s*title="([^"]+)",\s*description="([^"]*)"\]', content)
@@ -233,17 +227,10 @@ class AIAgentService:
                         description=desc,
                     )
                 )
-                return ChatResponse(
-                    role="assistant",
-                    content=f"Я успешно создал проект «{title}»!",
-                    conversation_id=request.conversation_id,
-                )
+                actions.append(AIAction(type="create_project", payload={"title": title}))
+                content = f"Я успешно создал проект «{title}»!"
             except Exception as e:
-                return ChatResponse(
-                    role="assistant",
-                    content=f"Не удалось создать проект: {e}",
-                    conversation_id=request.conversation_id,
-                )
+                content = f"Не удалось создать проект: {e}"
                 
         # 3. Задача
         create_task_match = re.search(r'\[CREATE_TASK:\s*project_id="([^"]+)",\s*title="([^"]+)",\s*description="([^"]*)"\]', content)
@@ -260,24 +247,22 @@ class AIAgentService:
                         description=desc,
                     )
                 )
-                return ChatResponse(
-                    role="assistant",
-                    content=f"Я успешно создал задачу «{title}»!",
-                    conversation_id=request.conversation_id,
-                )
+                actions.append(AIAction(type="create_task", payload={"title": title, "project_id": str(p_id)}))
+                content = f"Я успешно создал задачу «{title}»!"
             except Exception as e:
-                return ChatResponse(
-                    role="assistant",
-                    content=f"Не удалось создать задачу: {e}",
-                    conversation_id=request.conversation_id,
-                )
+                content = f"Не удалось создать задачу: {e}"
+
+        # 4. Навигация
+        navigate_match = re.search(r'\[NAVIGATE:\s*url="([^"]+)"\]', content)
+        if navigate_match:
+            url = navigate_match.group(1)
+            actions.append(AIAction(type="navigate", payload={"url": url}))
+            content = re.sub(r'\[NAVIGATE:\s*url="([^"]+)"\]', '', content).strip()
+            if not content:
+                content = f"Перехожу в раздел {url}..."
 
         if function_call is None:
-            content = (first_response.get("content") or "").strip()
-
-            # Fallback: AI ignored creation instructions but user clearly asked to create something
-            # and there is exactly one project — auto-create with sensible defaults.
-            if content and not any((create_note_match, create_project_match, create_task_match)):
+            if not any((create_note_match, create_project_match, create_task_match, navigate_match)):
                 if len(project_summaries) == 1:
                     single_project = project_summaries[0]
                     p_id = single_project.project.id
@@ -299,10 +284,12 @@ class AIAgentService:
                                     status=NoteStatus.DRAFT,
                                 )
                             )
+                            actions.append(AIAction(type="create_note", payload={"title": title, "project_id": str(p_id)}))
                             return ChatResponse(
                                 role="assistant",
                                 content=f"Я создал заметку «{title}» в проекте «{single_project.project.title}».",
                                 conversation_id=request.conversation_id,
+                                actions=actions
                             )
                         except Exception:
                             pass
@@ -319,25 +306,21 @@ class AIAgentService:
                                     description=question,
                                 )
                             )
+                            actions.append(AIAction(type="create_task", payload={"title": title, "project_id": str(p_id)}))
                             return ChatResponse(
                                 role="assistant",
                                 content=f"Я создал задачу «{title}» в проекте «{single_project.project.title}».",
                                 conversation_id=request.conversation_id,
+                                actions=actions
                             )
                         except Exception:
                             pass
 
-            if content:
-                return ChatResponse(
-                    role=first_response.get("role", "assistant"),
-                    content=content,
-                    conversation_id=request.conversation_id,
-                )
-            return await self._fallback_chat(
-                owner_user_id=owner_user_id,
-                request=request,
-                question=question,
-                project_summaries=project_summaries,
+            return ChatResponse(
+                role=first_response.get("role", "assistant"),
+                content=content or "Чем еще я могу помочь?",
+                conversation_id=request.conversation_id,
+                actions=actions
             )
 
         project_result = await self._execute_project_agent_call(
@@ -452,7 +435,9 @@ class AIAgentService:
                     "Formats (use EXACTLY, with real project IDs from the list below):\n"
                     "[CREATE_NOTE: project_id=\"<uuid>\", title=\"<note title>\", content=\"<note content>\"]\n"
                     "[CREATE_PROJECT: title=\"<project title>\", description=\"<project desc>\"]\n"
-                    "[CREATE_TASK: project_id=\"<uuid>\", title=\"<task title>\", description=\"<task desc>\"]\n\n"
+                    "[CREATE_TASK: project_id=\"<uuid>\", title=\"<task title>\", description=\"<task desc>\"]\n"
+                    "[NAVIGATE: url=\"<url>\"]\n\n"
+                    "Navigation URLs: /notes, /tasks, /projects, /files, /settings, /space\n\n"
                     "If the user mentions 'project' but does not specify which one, and there is ONLY ONE project available, "
                     "AUTOMATICALLY use that project's id. Do NOT ask to clarify when only one project exists.\n\n"
                     "Examples:\n"

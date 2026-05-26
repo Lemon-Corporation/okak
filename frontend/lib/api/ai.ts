@@ -8,6 +8,10 @@ export interface ChatMessage {
 export interface ChatResponse {
   role: string
   content: string
+  actions?: Array<{
+    type: string
+    payload: any
+  }>
 }
 
 export const aiApi = {

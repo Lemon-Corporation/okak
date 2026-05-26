@@ -88,7 +88,7 @@ export function AppSidebar() {
   }, [loadProjects, loadNotes, loadTasks, router])
 
   return (
-    <Sidebar>
+    <Sidebar data-tour="sidebar">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
           <Link href="/space" className="flex h-8 w-8 items-center justify-center rounded-lg bg-lime">

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { desktopGetWidgetBounds, desktopHideOverlay, desktopResizeWidget, desktopSetWidgetBounds, desktopWriteLog, onDesktopHideWidget, desktopBroadcast, onDesktopBroadcast } from '@/lib/electron'
-import { Bot, Mic, BrainCircuit, AudioLines, Moon, X, StickyNote, CheckSquare, FolderKanban, Sparkles } from 'lucide-react'
+import { desktopGetWidgetBounds, desktopHideOverlay, desktopResizeWidget, desktopSetWidgetBounds, desktopWriteLog, onDesktopHideWidget, desktopBroadcast, onDesktopBroadcast, desktopCenterWidget, desktopCompleteOnboarding } from '@/lib/electron'
+import { Bot, Mic, BrainCircuit, AudioLines, Moon, X, StickyNote, CheckSquare, FolderKanban, Sparkles, ChevronRight, Zap } from 'lucide-react'
 import { aiApi } from '@/lib/api'
 
 export default function WidgetPage() {
@@ -19,6 +19,11 @@ export default function WidgetPage() {
   const [isDraggingWidget, setIsDraggingWidget] = useState(false)
   const [isDragAnimating, setIsDragAnimating] = useState(false)
   const [activeAction, setActiveAction] = useState<'note' | 'task' | 'project' | null>(null)
+  const [isOnboarding, setIsOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(0)
+  const [isTouring, setIsTouring] = useState(false)
+  const [tourStep, setTourStep] = useState(0)
+  const [audioLevel, setAudioLevel] = useState(0)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -97,7 +102,7 @@ export default function WidgetPage() {
           
           try {
             logToDebug('Sending to STT...')
-            const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+            const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'
             const headers: HeadersInit = {}
             if (typeof window !== 'undefined') {
               const token = localStorage.getItem('okak_access_token')
@@ -189,7 +194,7 @@ export default function WidgetPage() {
     logToDebug('playTTS starting for:', text)
     return new Promise(async (resolve) => {
       try {
-        const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'
         const headers: HeadersInit = { 'Content-Type': 'application/json' }
         if (typeof window !== 'undefined') {
           const token = localStorage.getItem('okak_access_token')
@@ -279,6 +284,48 @@ export default function WidgetPage() {
     }
   };
 
+  useEffect(() => {
+    // Check if we need onboarding on mount
+    const checkOnboarding = async () => {
+      const platform = window.navigator.platform.toLowerCase()
+      if (typeof window !== 'undefined' && window.electron) {
+        const config = await window.electron.getConfig()
+        // If no token and not completed, start onboarding
+        const token = localStorage.getItem('okak_access_token')
+        if (!token) {
+          setIsOnboarding(true)
+          setIsExpanded(true)
+          await desktopCenterWidget()
+          startOnboarding()
+        }
+      }
+    }
+    checkOnboarding()
+  }, [])
+
+  const startOnboarding = async () => {
+    setOnboardingStep(1)
+    await playTTS('Привет! Я ОКАК — твой персональный ассистент для продуктивности. Я помогаю управлять задачами, заметками и проектами с помощью голоса.')
+    await playTTS('Давай немного попрактикуемся. Попробуй сказать: Создай задачу купить кофе.')
+    startRecording()
+  }
+
+  const nextOnboardingStep = async () => {
+    if (onboardingStep === 1) {
+      setOnboardingStep(2)
+      await playTTS('Отлично! Теперь попробуй переключиться между разделами. Скажи: Открой мои заметки.')
+      startRecording()
+    } else if (onboardingStep === 2) {
+      setOnboardingStep(3)
+      await playTTS('Замечательно. Вот список основных команд, которые я понимаю. Ты можешь создавать объекты, искать информацию и управлять навигацией.')
+      // Wait a bit to show commands
+      setTimeout(async () => {
+        setOnboardingStep(4)
+        await playTTS('А теперь давай зарегистрируемся, чтобы сохранить твои данные. Нажми кнопку ниже!')
+      }, 5000)
+    }
+  }
+
   const handleSendToAI = async (text: string) => {
     logToDebug('Sending to AI:', text)
     setIsThinking(true)
@@ -289,34 +336,45 @@ export default function WidgetPage() {
     const currentMessages = [...messages, userMessage];
     setMessages(currentMessages);
 
+    if (isOnboarding) {
+      setIsThinking(false)
+      const lower = text.toLowerCase()
+      if (onboardingStep === 1 && (lower.includes('задач') || lower.includes('кофе'))) {
+        setActiveAction('task')
+        setTimeout(() => setActiveAction(null), 2500)
+        await playTTS('Супер, задача добавлена!')
+        nextOnboardingStep()
+      } else if (onboardingStep === 2 && (lower.includes('заметк') || lower.includes('откр'))) {
+        await playTTS('Прекрасно, мы перешли в заметки!')
+        nextOnboardingStep()
+      } else {
+        await playTTS('Я тебя не совсем понял, попробуй еще раз или скажи ту фразу, которую я просил.')
+        startRecording()
+      }
+      return
+    }
+
     try {
       const res = await aiApi.chat(currentMessages)
       logToDebug('AI Response received:', res)
       
-      // Detect action from response content
-      const lowerRes = res.content.toLowerCase()
-      if (lowerRes.includes('заметк')) {
-        setActiveAction('note')
-        desktopBroadcast('app:sync-data', { type: 'note' })
+      // Detect action and perform side effects
+      if (res.actions && res.actions.length > 0) {
+        res.actions.forEach((action: any) => {
+          if (action.type === 'create_note') {
+            setActiveAction('note')
+            desktopBroadcast('app:sync-data', { type: 'note' })
+          } else if (action.type === 'create_task') {
+            setActiveAction('task')
+            desktopBroadcast('app:sync-data', { type: 'task' })
+          } else if (action.type === 'create_project') {
+            setActiveAction('project')
+            desktopBroadcast('app:sync-data', { type: 'project' })
+          } else if (action.type === 'navigate') {
+            desktopBroadcast('app:navigate', action.payload.url)
+          }
+        })
         setTimeout(() => setActiveAction(null), 2500)
-      } else if (lowerRes.includes('задач')) {
-        setActiveAction('task')
-        desktopBroadcast('app:sync-data', { type: 'task' })
-        setTimeout(() => setActiveAction(null), 2500)
-      } else if (lowerRes.includes('проект')) {
-        setActiveAction('project')
-        desktopBroadcast('app:sync-data', { type: 'project' })
-        setTimeout(() => setActiveAction(null), 2500)
-      }
-
-      // Detection for navigation
-      if (lowerRes.includes('откр') || lowerRes.includes('перей')) {
-        if (lowerRes.includes('заметк')) desktopBroadcast('app:navigate', '/notes')
-        else if (lowerRes.includes('задач')) desktopBroadcast('app:navigate', '/tasks')
-        else if (lowerRes.includes('проект')) desktopBroadcast('app:navigate', '/projects')
-        else if (lowerRes.includes('файл')) desktopBroadcast('app:navigate', '/files')
-        else if (lowerRes.includes('настрой')) desktopBroadcast('app:navigate', '/settings')
-        else if (lowerRes.includes('главн') || lowerRes.includes('простран')) desktopBroadcast('app:navigate', '/space')
       }
 
       setResponse(res.content)
@@ -387,7 +445,40 @@ export default function WidgetPage() {
         setResponse('')
       }
     })
+
+    // Listen for tour start
+    onDesktopBroadcast('app:start-tour', (data: { name: string }) => {
+      logToDebug('Tour starting for:', data.name)
+      startTour(data.name)
+    })
   }, [])
+
+  const startTour = async (name: string) => {
+    setIsTouring(true)
+    setIsExpanded(true)
+    setTourStep(1)
+    await playTTS(`Поздравляю с регистрацией, ${name.split(' ')[0]}! Давай я покажу тебе основные элементы управления.`)
+    
+    // Step 1: Sidebar
+    setTourStep(2)
+    desktopBroadcast('app:highlight', { element: 'sidebar', text: 'Здесь твоя навигация' })
+    await playTTS('Слева находится боковая панель. Отсюда ты можешь быстро переключаться между задачами, заметками и проектами.')
+    
+    // Step 2: Space
+    setTourStep(3)
+    desktopBroadcast('app:highlight', { element: 'space-header', text: 'Твое пространство' })
+    await playTTS('Сейчас ты в Пространстве — это твой главный хаб, где собрано всё самое важное на сегодня.')
+    
+    // Step 3: Finish
+    setTourStep(4)
+    desktopBroadcast('app:highlight', null)
+    await playTTS('Я всегда на связи в этом углу. Просто позови меня или нажми на кружок. Удачной работы!')
+    
+    setTimeout(() => {
+      setIsTouring(false)
+      handleClose()
+    }, 5000)
+  }
 
   const handleWidgetPointerDown = useCallback(async (e: React.PointerEvent) => {
     if (e.button !== 0) return
@@ -493,6 +584,11 @@ export default function WidgetPage() {
       animationRef.current = requestAnimationFrame(draw)
       analyserRef.current!.getByteFrequencyData(dataArray)
       
+      // Calculate audio level for dynamic scaling
+      const sum = dataArray.reduce((a, b) => a + b, 0)
+      const avg = sum / bufferLength
+      setAudioLevel(avg / 255) // normalized 0-1
+
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       
       const centerX = canvas.width / 2
@@ -557,14 +653,14 @@ export default function WidgetPage() {
         }}
         className={`group relative flex items-center backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
           isExpanded 
-            ? 'w-[400px] h-20 rounded-[2rem] bg-[#0a0a0c]/90 border border-white/10 shadow-2xl shadow-blue/20 p-1.5' 
-            : 'w-14 h-14 rounded-full bg-transparent hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-blue/20'
+            ? 'w-[400px] h-20 rounded-[2.5rem] bg-[#0a0a0c]/80 border border-white/10 shadow-2xl shadow-blue/20 p-1.5' 
+            : 'w-16 h-16 rounded-full bg-transparent cursor-pointer'
         }`}
         style={{ 
           WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}
       >
-        <div 
+        <motion.div 
           onClick={(e) => {
             if (isExpanded) return;
             e.preventDefault();
@@ -576,27 +672,72 @@ export default function WidgetPage() {
           onPointerMove={handleWidgetPointerMove}
           onPointerUp={handleWidgetPointerUp}
           onPointerCancel={handleWidgetPointerUp}
-          className={`relative flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-500 z-20 overflow-hidden ${
-            isExpanded ? 'w-16 h-16 mr-3 -ml-0.5' : 'w-full h-full'
-          } ${isDragAnimating ? 'scale-110 shadow-[0_0_24px_rgba(59,130,246,0.35)]' : ''}`}
+          animate={{
+            scale: isRecording ? 1 + audioLevel * 0.4 : isThinking ? [1, 1.05, 1] : 1,
+            borderRadius: isExpanded 
+              ? "2rem" 
+              : [
+                  "42% 58% 70% 30% / 45% 45% 55% 55%",
+                  "57% 43% 48% 52% / 50% 50% 50% 50%",
+                  "40% 60% 32% 68% / 51% 51% 49% 49%",
+                  "42% 58% 70% 30% / 45% 45% 55% 55%"
+                ],
+            rotate: isExpanded ? 0 : [0, 90, 180, 270, 360],
+          }}
+          transition={{
+            borderRadius: {
+              duration: isRecording ? 0.2 : 6,
+              repeat: Infinity,
+              ease: "easeInOut"
+            },
+            rotate: {
+              duration: 20,
+              repeat: Infinity,
+              ease: "linear"
+            },
+            scale: {
+              type: "spring",
+              stiffness: 300,
+              damping: 15
+            }
+          }}
+          className={`relative flex-shrink-0 flex items-center justify-center transition-all duration-500 z-20 ${
+            isExpanded ? 'w-16 h-16 mr-3 -ml-0.5 overflow-hidden' : 'w-full h-full'
+          } ${isDragAnimating ? 'scale-110' : ''}`}
           style={{
             transform: 'translateZ(0)',
-            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
             isolation: 'isolate',
             WebkitAppRegion: 'no-drag',
           } as React.CSSProperties}>
           
-          {/* Base pure gradient for collapsed state */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${isUnauthorized ? 'from-red-500 via-red-600 to-orange-500' : 'from-[#3b82f6] via-[#60a5fa] to-[#a3e635]'} rounded-full transition-opacity duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`} />
+          {/* Main Blob Background */}
+          <div className={`absolute inset-0 bg-gradient-to-br ${isUnauthorized ? 'from-red-500 via-red-600 to-orange-500' : 'from-[#3b82f6] via-[#60a5fa] to-[#a3e635]'} transition-all duration-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]`} 
+               style={{ borderRadius: 'inherit' }} />
 
-          {/* Expanded mode animated layers */}
-          <div className={`absolute inset-0 transition-opacity duration-500 ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
-            <div className={`absolute inset-0 ${isUnauthorized ? 'bg-red-900' : 'bg-blue-dark'} opacity-50 blur-[10px] rounded-full`} />
-            <div className={`absolute -inset-[50%] animate-[spin_6s_linear_infinite] rounded-full ${isUnauthorized ? 'bg-[conic-gradient(from_0deg,var(--color-red-500),var(--color-orange-500),var(--color-red-900),var(--color-red-500))]' : 'bg-[conic-gradient(from_0deg,var(--color-blue),var(--color-lime),var(--color-blue-dark),var(--color-blue))]'} opacity-80 mix-blend-screen blur-[4px]`} />
-            <div className={`absolute -inset-[50%] animate-[spin_10s_ease-in-out_infinite_reverse] rounded-full ${isUnauthorized ? 'bg-[conic-gradient(from_180deg,transparent,var(--color-red-500),var(--color-orange-700),transparent)]' : 'bg-[conic-gradient(from_180deg,transparent,var(--color-blue),var(--color-lime-dark),transparent)]'} opacity-90 mix-blend-overlay blur-[2px]`} />
-            <div className={`absolute inset-1 rounded-full bg-gradient-to-tr ${isUnauthorized ? 'from-orange-500/40 to-red-500/40' : 'from-lime/40 to-blue/40'} blur-[2px] animate-[pulse_4s_ease-in-out_infinite]`} />
-            <div className="absolute inset-[1px] rounded-full bg-background/40 backdrop-blur-[4px] border border-white/20 transition-colors" />
-          </div>
+          {/* Internal Plasma Glow 1 */}
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.6, 0.3],
+              rotate: [0, -180, -360]
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-1 bg-white/20 blur-md"
+            style={{ borderRadius: 'inherit' }}
+          />
+
+          {/* Internal Plasma Glow 2 */}
+          <motion.div 
+            animate={{ 
+              scale: [1.2, 0.8, 1.2],
+              opacity: [0.2, 0.5, 0.2],
+              x: [0, 5, -5, 0],
+              y: [0, -5, 5, 0]
+            }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            className={`absolute inset-2 ${isUnauthorized ? 'bg-orange-400/30' : 'bg-lime-400/30'} blur-sm`}
+            style={{ borderRadius: 'inherit' }}
+          />
 
           {/* Equalizer Canvas overlaps everything in the circle */}
           <canvas 
@@ -667,7 +808,7 @@ export default function WidgetPage() {
               </>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
         <div 
           className={`flex-1 overflow-hidden transition-all duration-500 flex flex-col justify-center pr-8 z-10 ${
@@ -675,7 +816,62 @@ export default function WidgetPage() {
           }`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          {isThinking ? (
+          {isOnboarding ? (
+            <div className="flex flex-col">
+              {onboardingStep === 1 && (
+                <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                  <p className="text-white font-bold text-sm">Шаг 1: Команды</p>
+                  <p className="text-white/70 text-xs mt-0.5">Скажи: «Создай задачу купить кофе»</p>
+                </div>
+              )}
+              {onboardingStep === 2 && (
+                <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                  <p className="text-white font-bold text-sm">Шаг 2: Навигация</p>
+                  <p className="text-white/70 text-xs mt-0.5">Скажи: «Открой мои заметки»</p>
+                </div>
+              )}
+              {onboardingStep === 3 && (
+                <div className="animate-in fade-in slide-in-from-left-4 duration-500 overflow-y-auto max-h-16 no-scrollbar">
+                  <p className="text-white font-bold text-xs uppercase mb-1">Доступные команды</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <p className="text-white/60 text-[10px] flex items-center gap-1"><Zap className="w-2 h-2 text-lime" /> Создай задачу...</p>
+                    <p className="text-white/60 text-[10px] flex items-center gap-1"><Zap className="w-2 h-2 text-lime" /> Создай заметку...</p>
+                    <p className="text-white/60 text-[10px] flex items-center gap-1"><Zap className="w-2 h-2 text-lime" /> Перейди в...</p>
+                    <p className="text-white/60 text-[10px] flex items-center gap-1"><Zap className="w-2 h-2 text-lime" /> Найди файл...</p>
+                  </div>
+                </div>
+              )}
+              {onboardingStep === 4 && (
+                <div className="animate-in fade-in zoom-in duration-500 flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-bold text-sm">Почти готово!</p>
+                    <p className="text-white/70 text-xs">Давай создадим аккаунт</p>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      setIsOnboarding(false)
+                      await desktopCompleteOnboarding()
+                      desktopBroadcast('app:navigate', '/register')
+                    }}
+                    className="ml-4 px-3 py-1.5 bg-lime text-black text-xs font-black rounded-lg hover:scale-105 active:scale-95 transition-transform"
+                  >
+                    ПОЕХАЛИ <ChevronRight className="inline w-3 h-3 ml-0.5" />
+                  </button>
+                </div>
+              )}
+              {!onboardingStep && <p className="text-white text-sm font-medium">Загрузка ОКАК...</p>}
+            </div>
+          ) : isTouring ? (
+            <div className="flex flex-col">
+              <span className="text-[10px] text-lime/80 font-bold uppercase tracking-wider mb-1">Обучение</span>
+              <p className="text-white text-sm leading-snug">
+                {tourStep === 1 && "Добро пожаловать в ОКАК!"}
+                {tourStep === 2 && "Это твоя панель управления."}
+                {tourStep === 3 && "Твое рабочее пространство."}
+                {tourStep === 4 && "Приятного использования!"}
+              </p>
+            </div>
+          ) : isThinking ? (
             <div className="flex items-center gap-2">
               <span className="text-white/80 font-medium text-sm">ОКАК думает</span>
               <span className="flex gap-1">

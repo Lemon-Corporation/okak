@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:8000'
+const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:8001'
 
 const nextConfig = {
   devIndicators: {
@@ -15,14 +15,12 @@ const nextConfig = {
   },
   output: 'standalone',
   async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/api/v1/:path*',
-          destination: `${apiInternalUrl}/api/v1/:path*`,
-        },
-      ],
-    }
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiInternalUrl}/api/v1/:path*`,
+      },
+    ]
   },
 }
 

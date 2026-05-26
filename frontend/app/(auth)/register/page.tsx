@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAppStore } from '@/lib/store'
 import { ApiError } from '@/lib/api'
+import { desktopBroadcast } from '@/lib/electron'
 import { FileText, Loader2 } from 'lucide-react'
 
 const errorMessages: Record<string, string> = {
@@ -54,6 +55,7 @@ export default function RegisterPage() {
     setIsLoading(true)
     try {
       await register(normalizedEmail, password, normalizedName)
+      desktopBroadcast('app:start-tour', { name: normalizedName })
       router.push('/space')
     } catch (err) {
       if (err instanceof ApiError) {

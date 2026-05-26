@@ -64,6 +64,8 @@ export interface ElectronAPI {
   writeLog(message: string): void
   onToggleWidgetExpand(callback: () => void): void
   onHideWidget(callback: () => void): void
+  centerWidget(): Promise<void>
+  completeOnboarding(): Promise<void>
   broadcast(channel: string, data: any): void
   onBroadcast(channel: string, callback: (data: any) => void): void
 }
@@ -299,49 +301,49 @@ export async function desktopStopFind(): Promise<void> {
 }
 
 export function onDesktopFoundInPage(callback: (result: { requestId: number; activeMatchOrdinal: number; matches: number }) => void): void {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.onFoundInPage) return
   window.electron!.onFoundInPage(callback)
 }
 
 export async function desktopClipboardRead(): Promise<{ text: string; html: string; rtf: string }> {
-  if (!isElectron()) {
+  if (!isElectron() || !window.electron!.clipboardRead) {
     return { text: '', html: '', rtf: '' }
   }
   return window.electron!.clipboardRead()
 }
 
 export async function desktopClipboardWrite(text: string): Promise<void> {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.clipboardWrite) return
   return window.electron!.clipboardWrite(text)
 }
 
 export function onDesktopQuickNote(callback: (data: { title: string; content: string; source: string }) => void): void {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.onQuickNote) return
   window.electron!.onQuickNote(callback)
 }
 
 export async function desktopShowOverlay(): Promise<void> {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.showOverlay) return
   return window.electron!.showOverlay()
 }
 
 export async function desktopHideOverlay(): Promise<void> {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.hideOverlay) return
   return window.electron!.hideOverlay()
 }
 
 export async function desktopToggleOverlay(): Promise<void> {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.toggleOverlay) return
   return window.electron!.toggleOverlay()
 }
 
 export async function desktopIsOverlayVisible(): Promise<boolean> {
-  if (!isElectron()) return false
+  if (!isElectron() || !window.electron!.isOverlayVisible) return false
   return window.electron!.isOverlayVisible()
 }
 
 export async function desktopResizeWidget(expanded: boolean): Promise<void> {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.resizeWidget) return
   return window.electron!.resizeWidget(expanded)
 }
 
@@ -364,8 +366,18 @@ export function desktopWriteLog(message: string): void {
 }
 
 export function onDesktopHideWidget(callback: () => void): void {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.onHideWidget) return
   window.electron!.onHideWidget(callback)
+}
+
+export async function desktopCenterWidget(): Promise<void> {
+  if (!isElectron() || !window.electron!.centerWidget) return
+  return window.electron!.centerWidget()
+}
+
+export async function desktopCompleteOnboarding(): Promise<void> {
+  if (!isElectron() || !window.electron!.completeOnboarding) return
+  return window.electron!.completeOnboarding()
 }
 
 export function desktopBroadcast(channel: string, data: any): void {
@@ -374,6 +386,6 @@ export function desktopBroadcast(channel: string, data: any): void {
 }
 
 export function onDesktopBroadcast(channel: string, callback: (data: any) => void): void {
-  if (!isElectron()) return
+  if (!isElectron() || !window.electron!.onBroadcast) return
   window.electron!.onBroadcast(channel, callback)
 }

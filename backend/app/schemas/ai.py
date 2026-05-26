@@ -34,12 +34,18 @@ class AISource(BaseModel):
     project_id: uuid.UUID | None = None
 
 
+class AIAction(BaseModel):
+    type: str  # 'create_note', 'create_task', 'create_project', 'navigate', 'search'
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class ChatResponse(BaseModel):
     role: str
     content: str
     conversation_id: uuid.UUID | None = None
     used_projects: list[AIUsedProject] = Field(default_factory=list)
     sources: list[AISource] = Field(default_factory=list)
+    actions: list[AIAction] = Field(default_factory=list)
 
 
 class TTSRequest(BaseModel):

@@ -125,7 +125,7 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       {/* Top bar */}
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">           
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5" data-tour="space-header">           
         <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-white">
           <Bot className="h-4 w-4" />
         </div>
