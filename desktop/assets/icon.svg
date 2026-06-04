@@ -1,14 +1,16 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="256" height="256" rx="72" fill="url(#bg)"/>
-  <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#inner)" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
-  <circle cx="70" cy="72" r="36" fill="url(#limeGlow)" opacity="0.55"/>
-  <circle cx="198" cy="194" r="40" fill="url(#cyanGlow)" opacity="0.22"/>
+  <g transform="translate(22 22) scale(0.828125)">
+    <rect width="256" height="256" rx="72" fill="url(#bg)"/>
+    <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#inner)" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
+    <circle cx="70" cy="72" r="36" fill="url(#limeGlow)" opacity="0.55"/>
+    <circle cx="198" cy="194" r="40" fill="url(#cyanGlow)" opacity="0.22"/>
 
-  <g filter="url(#shadow)">
-    <rect x="84" y="94" width="16" height="56" rx="8" fill="url(#bar)"/>
-    <rect x="108" y="76" width="16" height="92" rx="8" fill="url(#bar)"/>
-    <rect x="132" y="60" width="16" height="124" rx="8" fill="url(#bar)"/>
-    <rect x="156" y="86" width="16" height="72" rx="8" fill="url(#bar)"/>
+    <g filter="url(#shadow)">
+      <rect x="84" y="94" width="16" height="56" rx="8" fill="url(#bar)"/>
+      <rect x="108" y="76" width="16" height="92" rx="8" fill="url(#bar)"/>
+      <rect x="132" y="60" width="16" height="124" rx="8" fill="url(#bar)"/>
+      <rect x="156" y="86" width="16" height="72" rx="8" fill="url(#bar)"/>
+    </g>
   </g>
 
   <defs>
