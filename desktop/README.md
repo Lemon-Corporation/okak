@@ -119,7 +119,7 @@ git push origin v0.1.0
 
 GitHub Actions автоматически:
 - Собирает `.dmg` (macOS) и `.exe` (Windows)
-- Публикует в [okak-release](https://github.com/Lemon-Corporation/okak-release/releases) — отдельный публичный репозиторий
+- Публикует релизы в основной репозиторий [okak](https://github.com/Lemon-Corporation/okak/releases) и в публичный репозиторий [okak-release](https://github.com/Lemon-Corporation/okak-release/releases)
 
 **Зачем отдельный репозиторий?**
 - Открытый исходный код релизов = доверие пользователей
@@ -144,7 +144,7 @@ autoUpdater.checkForUpdatesAndNotify()
 Если v0.1.1 > v0.1.0 → скачивает → уведомляет пользователя
 ```
 
-**Настройка:** `electron-builder.yml` → `publish: github` (owner: Lemon-Corporation, repo: okak)
+**Настройка:** `electron-builder.yml` → `publish` (массив с репозиториями `okak` и `okak-release`)
 
 ## Windows Code Signing (убрать SmartScreen)
 

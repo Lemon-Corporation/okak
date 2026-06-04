@@ -155,7 +155,7 @@ function createWindow(): void {
 
     log.info('[prod] starting standalone server:', serverPath)
     serverProcess = spawn(process.execPath, [serverPath], {
-      env: { ...process.env, PORT: port },
+      env: { ...process.env, PORT: port, API_INTERNAL_URL: config.apiUrl },
       cwd: path.dirname(serverPath),
       stdio: 'pipe',
     })

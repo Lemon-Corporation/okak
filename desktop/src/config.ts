@@ -9,7 +9,7 @@ function getConfig(): DesktopConfig {
   const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development'
 
   // In dev mode, assume backend runs locally
-  const defaultApiUrl = isDev ? 'http://localhost:8000' : 'https://api.okak.app'
+  const defaultApiUrl = isDev ? 'http://localhost:8001' : 'https://okakai.ru'
 
   const apiUrl = process.env.API_URL || defaultApiUrl
 

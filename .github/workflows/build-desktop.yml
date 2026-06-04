@@ -33,7 +33,7 @@ jobs:
       - name: Build DMG
         run: cd desktop && npx electron-builder --mac dmg --publish never
 
-      - name: Publish to okak-release
+      - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop && npx electron-builder --mac dmg --publish always
         env:
@@ -89,7 +89,7 @@ jobs:
           done
         continue-on-error: true
 
-      - name: Publish to okak-release
+      - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop; npx electron-builder --win nsis --publish always
         env:
@@ -125,7 +125,7 @@ jobs:
       - name: Build AppImage
         run: cd desktop && npx electron-builder --linux AppImage --publish never
 
-      - name: Publish to okak-release
+      - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop && npx electron-builder --linux AppImage --publish always
         env:
