@@ -23,6 +23,7 @@ function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const login = useAppStore((state) => state.login)
+  const isDesktopApp = isElectron()
   const [email, setEmail] = useState(searchParams.get('email') ?? '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -48,7 +49,7 @@ function LoginPageContent() {
     try {
       setUnverifiedEmail('')
       await login(normalizedEmail, password)
-      if (isElectron()) {
+      if (isDesktopApp) {
         router.push('/space')
       } else if (getStoredClientMode() === 'browser') {
         router.push('/space')
@@ -165,15 +166,19 @@ function LoginPageContent() {
           </p>
         </div>
 
-        <div className="mt-4 text-center">
-          <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
-            Посмотреть тарифы
-          </Link>
-        </div>
+        {!isDesktopApp && (
+          <>
+            <div className="mt-4 text-center">
+              <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
+                Посмотреть тарифы
+              </Link>
+            </div>
 
-        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
-          В браузере доступны заметки, проекты и задачи. Голосовой помощник и плавающий виджет работают в приложении для desktop.
-        </p>
+            <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
+              В браузере доступны заметки, проекты и задачи. Голосовой помощник и плавающий виджет работают в приложении для desktop.
+            </p>
+          </>
+        )}
       </div>
     </div>
   )

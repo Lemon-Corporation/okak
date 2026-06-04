@@ -949,11 +949,16 @@ ipcMain.handle('app:is-overlay-visible', () => {
 ipcMain.handle('app:resize-widget', (_event, expanded: boolean) => {
   if (widgetWindow) {
     const current = widgetWindow.getBounds()
+    const nextWidth = expanded ? 450 : 100
+    const nextHeight = expanded ? 120 : 100
+
+    // Preserve the right edge while resizing so the widget expands leftward
+    // and collapses back to the same visual anchor instead of drifting.
     const next = clampWidgetBounds({
-      x: current.x,
+      x: current.x + current.width - nextWidth,
       y: current.y,
-      width: expanded ? 450 : 100,
-      height: expanded ? 120 : 100,
+      width: nextWidth,
+      height: nextHeight,
     })
     widgetWindow.setBounds(next)
   }
