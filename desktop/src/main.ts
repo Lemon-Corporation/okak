@@ -19,7 +19,6 @@ import {
 } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import path from 'path'
-import { spawn, type ChildProcess } from 'child_process'
 import log from 'electron-log'
 import Store from 'electron-store'
 import { config } from './config'
@@ -45,7 +44,6 @@ if (isDev) {
 let mainWindow: BrowserWindow | null = null
 let widgetWindow: BrowserWindow | null = null
 let tray: Tray | null = null
-let serverProcess: ChildProcess | null = null
 
 // Auto-updater
 if (!isDev) {
@@ -100,6 +98,88 @@ function getIcon(): Electron.NativeImage | undefined {
   }
 }
 
+async function showLoadError(window: BrowserWindow, details: { title: string; body: string }): Promise<void> {
+  const html = `<!doctype html>
+  <html lang="ru">
+    <head>
+      <meta charset="utf-8" />
+      <title>${details.title}</title>
+      <style>
+        body {
+          margin: 0;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          background: #f6f7fb;
+          color: #172033;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+        }
+        main {
+          max-width: 560px;
+          margin: 32px;
+          padding: 28px;
+          border-radius: 20px;
+          background: white;
+          box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+        }
+        h1 {
+          margin: 0 0 12px;
+          font-size: 28px;
+        }
+        p {
+          margin: 0;
+          line-height: 1.5;
+          white-space: pre-wrap;
+        }
+      </style>
+    </head>
+    <body>
+      <main>
+        <h1>${details.title}</h1>
+        <p>${details.body}</p>
+      </main>
+    </body>
+  </html>`
+
+  await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+}
+
+function buildAppUrl(route: string): string {
+  const baseUrl = isDev ? 'http://localhost:3000' : config.appUrl
+  return new URL(route, `${baseUrl.replace(/\/$/, '')}/`).toString()
+}
+
+function waitForAppUrl(window: BrowserWindow, url: string, context: 'dev' | 'prod'): void {
+  let attempts = 0
+  const maxAttempts = 30
+
+  const tryLoad = () => {
+    attempts++
+    window.loadURL(url).catch(async (error) => {
+      if (attempts < maxAttempts) {
+        log.info(`[${context}] waiting for ${url}, attempt ${attempts}/${maxAttempts}`)
+        setTimeout(tryLoad, 1000)
+        return
+      }
+
+      log.error(`[${context}] failed to connect to ${url} after ${maxAttempts} attempts`, error)
+      await showLoadError(window, {
+        title: 'OKAK не смог запуститься',
+        body:
+          context === 'prod'
+            ? `Не удалось открыть ${config.appUrl}. Проверьте подключение к интернету и доступность сайта.`
+            : 'Локальный frontend не ответил на http://localhost:3000/login. Проверьте, что dev-сервер Next.js запущен.',
+      })
+      if (!window.isVisible()) {
+        window.show()
+      }
+    })
+  }
+
+  tryLoad()
+}
+
 function createWindow(): void {
   const savedBounds = (windowStore as any).get('bounds') as { width: number; height: number; x?: number; y?: number }
 
@@ -129,62 +209,20 @@ function createWindow(): void {
 
   // Load app with retry for dev mode
   if (isDev) {
-    const devUrl = 'http://localhost:3000/login'
-    let attempts = 0
-    const maxAttempts = 30
-
-    const tryLoad = () => {
-      attempts++
-      mainWindow!.loadURL(devUrl).catch(() => {
-        if (attempts < maxAttempts) {
-          log.info(`[dev] waiting for ${devUrl}, attempt ${attempts}/${maxAttempts}`)
-          setTimeout(tryLoad, 1000)
-        } else {
-          log.error(`[dev] failed to connect to ${devUrl} after ${maxAttempts} attempts`)
-        }
-      })
-    }
-    tryLoad()
+    const devUrl = buildAppUrl('/login')
+    waitForAppUrl(mainWindow, devUrl, 'dev')
     mainWindow.webContents.openDevTools()
   } else {
-    // Production: start standalone Next.js server from extraResources
-    const resourcesPath = process.resourcesPath
-    const serverPath = path.join(resourcesPath, 'frontend', '.next', 'standalone', 'frontend', 'server.js')
-    const port = process.env.PORT || '3000'
-    const prodUrl = `http://localhost:${port}/login`
-
-    log.info('[prod] starting standalone server:', serverPath)
-    serverProcess = spawn(process.execPath, [serverPath], {
-      env: { ...process.env, PORT: port, API_INTERNAL_URL: config.apiUrl, ELECTRON_RUN_AS_NODE: '1' },
-      cwd: path.dirname(serverPath),
-      stdio: 'pipe',
-    })
-
-    serverProcess.stdout?.on('data', (data) => {
-      log.info('[server]', data.toString().trim())
-    })
-    serverProcess.stderr?.on('data', (data) => {
-      log.error('[server]', data.toString().trim())
-    })
-
-    let attempts = 0
-    const maxAttempts = 30
-    const tryLoad = () => {
-      attempts++
-      mainWindow!.loadURL(prodUrl).catch(() => {
-        if (attempts < maxAttempts) {
-          log.info(`[prod] waiting for ${prodUrl}, attempt ${attempts}/${maxAttempts}`)
-          setTimeout(tryLoad, 1000)
-        } else {
-          log.error(`[prod] failed to connect to ${prodUrl} after ${maxAttempts} attempts`)
-        }
-      })
-    }
-    tryLoad()
+    const prodUrl = buildAppUrl('/login')
+    waitForAppUrl(mainWindow, prodUrl, 'prod')
   }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    log.error('[window] did-fail-load:', errorCode, errorDescription, validatedURL)
   })
 
   // Open external links in system browser
@@ -354,8 +392,8 @@ function createWidgetWindow(): void {
   })
 
   const widgetUrl = isDev
-    ? 'http://localhost:3000/widget'
-    : `http://localhost:${process.env.PORT || '3000'}/widget`
+    ? buildAppUrl('/widget')
+    : buildAppUrl('/widget')
 
   widgetWindow.loadURL(widgetUrl).then(() => {
     log.info('[widget] URL loaded successfully');
@@ -1079,7 +1117,7 @@ app.on('open-url', (event, url) => {
   log.info('[deep-link] opened:', url)
   if (mainWindow) {
     const route = url.replace('okak://', '')
-    mainWindow.loadURL(isDev ? `http://localhost:3000/${route}` : `http://localhost:${process.env.PORT || '3000'}/${route}`)
+    mainWindow.loadURL(buildAppUrl(route))
     mainWindow.show()
     mainWindow.focus()
   }
@@ -1186,13 +1224,6 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   if (process.platform === 'darwin' && mainWindow) {
     mainWindow.removeAllListeners('close')
-  }
-})
-
-app.on('quit', () => {
-  if (serverProcess) {
-    serverProcess.kill()
-    serverProcess = null
   }
 })
 

@@ -11,12 +11,6 @@ files:
   - assets/**/*
   - package.json
 
-extraResources:
-  - from: ../frontend/.next/standalone
-    to: frontend/.next/standalone
-    filter:
-      - "**/*"
-
 extraMetadata:
   main: dist/main.js
 

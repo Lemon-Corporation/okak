@@ -1,5 +1,6 @@
 export interface DesktopConfig {
   apiUrl: string
+  appUrl: string
   isDev: boolean
 }
 
