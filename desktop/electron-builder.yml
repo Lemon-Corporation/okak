@@ -31,6 +31,10 @@ mac:
       arch:
         - x64
         - arm64
+    - target: pkg
+      arch:
+        - x64
+        - arm64
 
 win:
   icon: assets/icon.png

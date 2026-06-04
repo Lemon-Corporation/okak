@@ -30,19 +30,21 @@ jobs:
       - name: Build desktop
         run: cd desktop && pnpm build
 
-      - name: Build DMG
-        run: cd desktop && npx electron-builder --mac dmg --publish never
+      - name: Build DMG and PKG
+        run: cd desktop && npx electron-builder --mac dmg pkg --publish never
 
       - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
-        run: cd desktop && npx electron-builder --mac dmg --publish always
+        run: cd desktop && npx electron-builder --mac dmg pkg --publish always
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: OKAK-macos
-          path: desktop/release/*.dmg
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.pkg
 
   build-windows:
     runs-on: windows-latest
