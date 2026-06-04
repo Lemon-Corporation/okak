@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAppStore } from '@/lib/store'
 import { formatRelativeDate } from '@/lib/utils'
+import { EmptyState } from '@/components/empty-state'
 import {
   Plus,
   Search,
@@ -193,23 +194,17 @@ export default function NotesPage() {
         </div>
 
         {filteredNotes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <StickyNote className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium text-foreground">
-              {searchQuery ? 'Заметки не найдены' : 'Нет заметок'}
-            </h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {searchQuery
-                ? 'Попробуйте изменить запрос поиска'
-                : 'Создайте первую заметку, чтобы начать'}
-            </p>
-            {!searchQuery && (
-              <Button onClick={handleCreateNote}>
-                <Plus className="h-4 w-4" />
-                Создать заметку
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={StickyNote}
+            title={searchQuery ? 'Заметки не найдены' : 'Нет заметок'}
+            description={searchQuery
+              ? `По запросу "${searchQuery}" ничего не нашлось. Попробуйте изменить фильтры.`
+              : 'Создайте свою первую заметку, чтобы зафиксировать идеи или планы.'
+            }
+            actionLabel="Создать заметку"
+            onAction={handleCreateNote}
+            isSearch={!!searchQuery}
+          />
         ) : (
           <div className="space-y-6">
             {pinnedNotes.length > 0 && (

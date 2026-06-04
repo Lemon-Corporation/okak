@@ -1,66 +1,41 @@
-<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background glow -->
-  <circle cx="100" cy="100" r="90" fill="url(#glow)" opacity="0.2"/>
-  
-  <!-- Main circle -->
-  <circle cx="100" cy="100" r="70" fill="#0038FF"/>
-  
-  <!-- OKAK letters - stylized -->
-  <text x="100" y="100" text-anchor="middle" dominant-baseline="central" font-family="Arial Black, sans-serif" font-weight="900" font-size="48" fill="#BFFF00">
-    OK
-  </text>
-  
-  <!-- Second line AK -->
-  <text x="100" y="130" text-anchor="middle" dominant-baseline="central" font-family="Arial Black, sans-serif" font-weight="900" font-size="36" fill="white">
-    AK
-  </text>
-  
-  <!-- Voice wave indicators -->
-  <path d="M175 100 Q185 95 185 100 Q185 105 175 100" stroke="#BFFF00" stroke-width="3" fill="none" stroke-linecap="round">
-    <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
-  </path>
-  <path d="M185 100 Q195 93 195 100 Q195 107 185 100" stroke="#BFFF00" stroke-width="3" fill="none" stroke-linecap="round">
-    <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" begin="0.3s"/>
-  </path>
-  
-  <!-- Left wave -->
-  <path d="M25 100 Q15 95 15 100 Q15 105 25 100" stroke="#BFFF00" stroke-width="3" fill="none" stroke-linecap="round">
-    <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" begin="0.7s"/>
-  </path>
-  <path d="M15 100 Q5 93 5 100 Q5 107 15 100" stroke="#BFFF00" stroke-width="3" fill="none" stroke-linecap="round">
-    <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" begin="1s"/>
-  </path>
-  
-  <!-- Connection dots around -->
-  <circle cx="100" cy="20" r="4" fill="#BFFF00">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="160" cy="45" r="3" fill="#BFFF00" opacity="0.7">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2.3s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="180" cy="100" r="4" fill="#BFFF00">
-    <animate attributeName="opacity" values="0.6;1;0.6" dur="1.8s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="160" cy="155" r="3" fill="#BFFF00" opacity="0.8">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="2.1s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="100" cy="180" r="4" fill="#BFFF00">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2.5s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="40" cy="155" r="3" fill="#BFFF00" opacity="0.6">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="1.9s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="20" cy="100" r="4" fill="#BFFF00">
-    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="40" cy="45" r="3" fill="#BFFF00" opacity="0.5">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2.4s" repeatCount="indefinite"/>
-  </circle>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="72" fill="url(#bg)"/>
+  <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#inner)" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
+  <circle cx="70" cy="72" r="36" fill="url(#limeGlow)" opacity="0.55"/>
+  <circle cx="198" cy="194" r="40" fill="url(#cyanGlow)" opacity="0.22"/>
+
+  <g filter="url(#shadow)">
+    <rect x="84" y="94" width="16" height="56" rx="8" fill="url(#bar)"/>
+    <rect x="108" y="76" width="16" height="92" rx="8" fill="url(#bar)"/>
+    <rect x="132" y="60" width="16" height="124" rx="8" fill="url(#bar)"/>
+    <rect x="156" y="86" width="16" height="72" rx="8" fill="url(#bar)"/>
+  </g>
 
   <defs>
-    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0%" stop-color="#0038FF"/>
-      <stop offset="100%" stop-color="#0038FF" stop-opacity="0"/>
+    <linearGradient id="bg" x1="36" y1="20" x2="214" y2="234" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4D3BFF"/>
+      <stop offset="1" stop-color="#2432B8"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="128" y1="8" x2="128" y2="248" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.16)"/>
+      <stop offset="1" stop-color="rgba(255,255,255,0.04)"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="128" y1="60" x2="128" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#B7FF3A"/>
+    </linearGradient>
+    <radialGradient id="limeGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(70 72) rotate(90) scale(36)">
+      <stop stop-color="#B7FF3A"/>
+      <stop offset="1" stop-color="#B7FF3A" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="cyanGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(198 194) rotate(90) scale(40)">
+      <stop stop-color="#7EE7FF"/>
+      <stop offset="1" stop-color="#7EE7FF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="70" y="46" width="116" height="152" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#C0FF4C" flood-opacity="0.16"/>
+    </filter>
   </defs>
 </svg>

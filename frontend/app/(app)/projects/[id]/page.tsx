@@ -25,6 +25,8 @@ import {
 import { useAppStore } from '@/lib/store'
 import { formatRelativeDate, cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
+import { useFileDrop } from '@/hooks/use-file-drop'
+import { FileDropOverlay } from '@/components/file-drop-overlay'
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -83,9 +85,24 @@ export default function ProjectDetailPage() {
   const createFile = useAppStore((state) => state.createFile)
   const deleteFile = useAppStore((state) => state.deleteFile)
 
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [fileToDelete, setFileToDelete] = useState<{ id: string; name: string } | null>(null)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+
+  const handleUploadFiles = async (selectedFiles: File[]) => {
+    setIsUploadingFile(true)
+    try {
+      for (const file of selectedFiles) {
+        await createFile(file, projectId)
+      }
+    } finally {
+      setIsUploadingFile(false)
+    }
+  }
+
+  const { isDragging, handleDragOver, handleDragLeave, handleDrop } = useFileDrop({
+    onDrop: handleUploadFiles
+  })
 
   const project = projects.find((p) => p.id === projectId)
   const projectNotes = notes.filter((n) => n.projectId === projectId)
@@ -282,7 +299,13 @@ export default function ProjectDetailPage() {
   )
 
   return (
-    <div className="flex flex-col">
+    <div 
+      className="flex flex-col relative min-h-screen"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <FileDropOverlay isDragging={isDragging} isUploading={isUploadingFile} />
       <PageHeader
         title={project.name}
         breadcrumbs={[

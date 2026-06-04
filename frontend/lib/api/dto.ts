@@ -5,6 +5,7 @@ export interface BackendUser {
   email: string
   display_name: string
   plan: string
+  is_email_verified: boolean
   created_at: string
   updated_at?: string
 }
@@ -13,6 +14,16 @@ export interface AuthResponse {
   access_token: string
   token_type: 'bearer'
   user: BackendUser
+}
+
+export interface RegisterInitResponse {
+  email: string
+  requires_email_verification: boolean
+  message: string
+}
+
+export interface MessageResponse {
+  message: string
 }
 
 export interface BackendProject {

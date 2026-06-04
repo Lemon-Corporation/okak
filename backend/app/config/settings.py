@@ -8,14 +8,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AppSettings(BaseModel):
     name: str = "ОКАК API"
     version: str = "0.1.0"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: list[str] = Field(default_factory=list) # MUST BE SET IN PRODUCTION
 
 
 class PostgresSettings(BaseModel):
     host: str = "localhost"
     port: int = 5432
     user: str = "postgres"
-    password: str = "postgres"
+    password: str = "" # Set via environment variable
     database: str = "okak"
     echo: bool = False
 
@@ -28,9 +28,23 @@ class PostgresSettings(BaseModel):
 
 
 class AuthSettings(BaseModel):
-    secret_key: str = "change-me-in-production"
+    secret_key: str = Field(..., description="MUST BE SET IN PRODUCTION")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
+    verification_code_ttl_minutes: int = 15
+    password_reset_code_ttl_minutes: int = 15
+
+
+class EmailSettings(BaseModel):
+    enabled: bool = False
+    host: str = "smtp.mail.ru"
+    port: int = 465
+    username: str = ""
+    password: str = ""
+    from_email: str = ""
+    from_name: str = "ОКАК"
+    use_ssl: bool = True
+    use_starttls: bool = False
 
 
 class UploadSettings(BaseModel):
@@ -85,6 +99,7 @@ class Settings(BaseSettings):
     app: AppSettings = Field(default_factory=AppSettings)
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    email: EmailSettings = Field(default_factory=EmailSettings)
     uploads: UploadSettings = Field(default_factory=UploadSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
 

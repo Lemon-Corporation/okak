@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
 import { onDesktopBroadcast } from '@/lib/electron'
 import {
-  FileText,
   Home,
   FolderKanban,
   StickyNote,
@@ -29,8 +28,8 @@ import {
   Settings,
   LogOut,
   Plus,
-  Command,
 } from 'lucide-react'
+import { BrandLogo } from '@/components/brand-mark'
 
 const mainNavItems = [
   {
@@ -91,10 +90,14 @@ export function AppSidebar() {
     <Sidebar data-tour="sidebar">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
-          <Link href="/space" className="flex h-8 w-8 items-center justify-center rounded-lg bg-lime">
-            <FileText className="h-4 w-4 text-black" />
+          <Link href="/space" className="block">
+            <BrandLogo
+              compact
+              className="gap-2"
+              markClassName="shadow-none"
+              textClassName="text-sidebar-foreground"
+            />
           </Link>
-          <span className="font-semibold text-sidebar-foreground">ОКАК</span>
         </div>
       </SidebarHeader>
 

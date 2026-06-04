@@ -7,14 +7,22 @@ from app.presentation.dependencies import get_container, get_current_user
 from app.schemas.auth import (
     AuthResponse,
     AuthUserResponse,
+    ForgotPasswordRequest,
     LoginCommand,
     LoginRequest,
+    MessageResponse,
     RegisterCommand,
+    RegisterInitResponse,
     RegisterRequest,
+    ResendVerificationRequest,
+    ResetPasswordCommand,
+    ResetPasswordRequest,
     UpdateProfileCommand,
     UpdateProfileRequest,
     UserRecord,
     UserResponse,
+    VerifyEmailCommand,
+    VerifyEmailRequest,
 )
 
 router = APIRouter()
@@ -31,23 +39,22 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterInitResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterRequest,
     container: Annotated[AppContainer, Depends(get_container)],
-    response: Response,
-) -> AuthResponse:
-    result = await container.auth_service.register(
+    _response: Response,
+) -> RegisterInitResponse:
+    await container.auth_service.register(
         RegisterCommand(
             email=body.email,
             password=body.password,
             display_name=body.display_name,
         )
     )
-    _set_auth_cookie(response, result.access_token)
-    return AuthResponse(
-        access_token=result.access_token,
-        user=AuthUserResponse.model_validate(result.user),
+    return RegisterInitResponse(
+        email=body.email,
+        message="We sent a confirmation code to your email",
     )
 
 
@@ -91,3 +98,52 @@ async def update_me(
         ),
     )
     return UserResponse.model_validate(user)
+
+
+@router.post("/verify-email", response_model=AuthResponse)
+async def verify_email(
+    body: VerifyEmailRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+    response: Response,
+) -> AuthResponse:
+    result = await container.auth_service.verify_email(
+        VerifyEmailCommand(email=body.email, code=body.code)
+    )
+    _set_auth_cookie(response, result.access_token)
+    return AuthResponse(
+        access_token=result.access_token,
+        user=AuthUserResponse.model_validate(result.user),
+    )
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(
+    body: ResendVerificationRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+) -> MessageResponse:
+    await container.auth_service.resend_verification_code(body.email)
+    return MessageResponse(message="Verification code sent")
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+) -> MessageResponse:
+    await container.auth_service.request_password_reset(body.email)
+    return MessageResponse(message="If the account exists, we sent a reset code")
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(
+    body: ResetPasswordRequest,
+    container: Annotated[AppContainer, Depends(get_container)],
+) -> MessageResponse:
+    await container.auth_service.reset_password(
+        ResetPasswordCommand(
+            email=body.email,
+            code=body.code,
+            new_password=body.new_password,
+        )
+    )
+    return MessageResponse(message="Password updated")

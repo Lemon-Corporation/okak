@@ -28,6 +28,7 @@ class AuthUserResponse(BaseModel):
     email: EmailStr
     display_name: str
     plan: str
+    is_email_verified: bool
     created_at: datetime
 
 
@@ -39,6 +40,35 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: AuthUserResponse
+
+
+class RegisterInitResponse(BaseModel):
+    email: EmailStr
+    requires_email_verification: bool = True
+    message: str
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=8)
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -61,12 +91,30 @@ class UpdateProfileCommand:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class VerifyEmailCommand:
+    email: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ResetPasswordCommand:
+    email: str
+    code: str
+    new_password: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class UserRecord:
     id: uuid.UUID
     email: str
     display_name: str
     hashed_password: str
     plan: str
+    is_email_verified: bool
+    email_verification_code: str | None
+    email_verification_expires_at: datetime | None
+    password_reset_code: str | None
+    password_reset_expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

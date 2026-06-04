@@ -76,6 +76,11 @@ docker-compose.override.yml
 # Electron
 app/dist/
 app/build/
+desktop/release/
+desktop/release_before_packaging_attempt/
+desktop/*.dmg
+desktop/*.blockmap
+desktop/latest-*.yml
 
 # TypeScript
 *.tsbuildinfo

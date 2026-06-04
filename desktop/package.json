@@ -2,6 +2,7 @@
   "name": "okak-desktop",
   "version": "0.1.0",
   "description": "Desktop application for ОКАК",
+  "author": "Lemon Corporation",
   "main": "dist/main.js",
   "scripts": {
     "dev": "concurrently \"pnpm:next-dev\" \"pnpm:electron-dev\"",

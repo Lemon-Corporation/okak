@@ -4,30 +4,30 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from '@/components/brand-mark'
+import { detectDesktopPlatform, fetchLatestDesktopRelease, type DesktopPlatform } from '@/lib/releases'
 import {
   ArrowRight,
   CheckCircle2,
   CheckSquare,
   ChevronRight,
   Command,
-  FileText,
   Files,
   FolderKanban,
   Layers3,
   Menu,
   MousePointer2,
   Search,
-  Shield,
   Sparkles,
   StickyNote,
   Zap,
   ShieldCheck,
-  Clock3,
   X,
   Download,
   Apple,
   Monitor,
   Box,
+  Mic,
 } from 'lucide-react'
 
 const demoViews = ['capture', 'board', 'search'] as const
@@ -119,7 +119,7 @@ function CaptureDemo() {
         <div className="mb-4 flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-3">
           <Command className="h-4 w-4 text-blue" />
           <span className="text-sm font-medium text-foreground">Новая заметка для проекта</span>
-          <span className="ml-auto rounded-lg bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">⌘ Space</span>
+          <span className="ml-auto rounded-lg bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">⌘ Shift Space</span>
         </div>
         <div className="rounded-2xl bg-muted/60 p-4">
           <p className="text-sm leading-6 text-foreground">
@@ -359,6 +359,8 @@ function MobileNav() {
           </div>
           <div className="grid gap-3">
             {[
+              ['Скачать приложение', '/download'],
+              ['Открыть в браузере', '/register'],
               ['Как работает', '#how'],
               ['Возможности', '#features'],
               ['Тарифы', '/pricing'],
@@ -376,47 +378,23 @@ function MobileNav() {
 
 function Brand() {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
-      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue text-white shadow-lg shadow-blue/25">
-        <FileText className="h-5 w-5" />
-      </div>
-      <span className="text-lg font-black tracking-tight text-foreground">ОКАК</span>
+    <Link href="/" className="block">
+      <BrandLogo />
     </Link>
   )
 }
 
 function DownloadButton() {
-  const [os, setOs] = useState<'macos' | 'windows' | 'linux' | 'other'>('other')
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+  const [os, setOs] = useState<DesktopPlatform>('other')
   const [version, setVersion] = useState<string>('')
 
   useEffect(() => {
-    const platform = window.navigator.platform.toLowerCase()
-    if (platform.includes('mac')) setOs('macos')
-    else if (platform.includes('win')) setOs('windows')
-    else if (platform.includes('linux')) setOs('linux')
+    const currentOs = detectDesktopPlatform()
+    setOs(currentOs)
 
-    // Fetch latest release from GitHub
-    fetch('https://api.github.com/repos/Lemon-Corporation/okak-release/releases/latest')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.assets) {
-          setVersion(data.tag_name)
-          const currentOs = platform.includes('mac') ? 'macos' : platform.includes('win') ? 'windows' : platform.includes('linux') ? 'linux' : 'other'
-          
-          let asset;
-          if (currentOs === 'macos') {
-            asset = data.assets.find((a: any) => a.name.endsWith('.dmg'))
-          } else if (currentOs === 'windows') {
-            asset = data.assets.find((a: any) => a.name.endsWith('.exe'))
-          } else if (currentOs === 'linux') {
-            asset = data.assets.find((a: any) => a.name.endsWith('.AppImage'))
-          }
-          
-          if (asset) setDownloadUrl(asset.browser_download_url)
-        }
-      })
-      .catch(console.error)
+    void fetchLatestDesktopRelease(currentOs).then((release) => {
+      setVersion(release.version)
+    })
   }, [])
 
   const osInfo = {
@@ -433,18 +411,14 @@ function DownloadButton() {
     <Button
       size="lg"
       variant="outline"
+      asChild
       className="liquid-glass h-12 rounded-2xl border-0 px-6 text-base font-bold transition hover:-translate-y-0.5"
-      onClick={() => {
-        if (downloadUrl) {
-          window.location.href = downloadUrl
-        } else {
-          window.open('https://github.com/Lemon-Corporation/okak-release/releases', '_blank')
-        }
-      }}
     >
-      <Icon className="mr-2 h-4 w-4" />
-      Скачать для {current.label}
-      {version && <span className="ml-2 opacity-50 text-xs">{version}</span>}
+      <Link href="/download">
+        <Icon className="mr-2 h-4 w-4" />
+        Скачать для {current.label}
+        {version && <span className="ml-2 opacity-50 text-xs">{version}</span>}
+      </Link>
     </Button>
   )
 }
@@ -473,8 +447,8 @@ export default function LandingPage() {
               <Link href="/login">Войти</Link>
             </Button>
             <Button asChild className="bg-blue text-white shadow-lg shadow-blue/25 hover:bg-blue-dark">
-              <Link href="/register">
-                Начать
+              <Link href="/download">
+                Скачать приложение
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -510,30 +484,29 @@ export default function LandingPage() {
                 ОКАК помогает быстро фиксировать идеи, вести проекты, хранить файлы и возвращаться к нужной информации без хаоса в разных сервисах.
               </p>
 
+              <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-blue/10 px-3 py-1.5 text-sm font-semibold text-blue">
+                <Mic className="h-4 w-4" />
+                Голосовой помощник и плавающий виджет доступны в приложении для desktop
+              </div>
+
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <DownloadButton />
                 <Button
                   size="lg"
+                  variant="outline"
                   asChild
-                  className="h-12 rounded-2xl bg-blue px-6 text-base font-bold text-white shadow-xl shadow-blue/25 transition hover:-translate-y-0.5 hover:bg-blue-dark hover:shadow-blue/35"
+                  className="h-12 rounded-2xl px-6 text-base font-bold"
                 >
                   <Link href="/register">
-                    Начать бесплатно
+                    Открыть в браузере
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <DownloadButton />
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3 text-sm font-medium text-muted-foreground">
-                <span className="liquid-glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-blue" />
-                  demo@example.com / demo123
-                </span>
-                <span className="liquid-glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5">
-                  <Clock3 className="h-4 w-4 text-lime-700" />
-                  старт за 30 секунд
-                </span>
-              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Можно пользоваться и на сайте, но без голосового помощника. Полный сценарий начинается с установки приложения.
+              </p>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, scale: 0.94, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.7 }}>
@@ -647,8 +620,8 @@ export default function LandingPage() {
               </p>
               <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
                 <Button size="lg" asChild className="h-12 rounded-2xl bg-lime px-6 text-base font-black text-black shadow-xl shadow-black/20 hover:bg-lime-dark">
-                  <Link href="/register">
-                    Создать аккаунт
+                  <Link href="/download">
+                    Скачать приложение
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -658,7 +631,7 @@ export default function LandingPage() {
                   asChild
                   className="h-12 rounded-2xl border-white/30 bg-white/10 px-6 text-base font-black text-white backdrop-blur-xl hover:bg-white/20 hover:text-white"
                 >
-                  <Link href="/pricing">Посмотреть тарифы</Link>
+                  <Link href="/register">Открыть в браузере</Link>
                 </Button>
               </div>
             </div>
@@ -668,12 +641,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-border py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue">
-              <FileText className="h-3.5 w-3.5 text-white" />
-            </div>
-            <span className="text-sm font-medium text-foreground">ОКАК</span>
-          </div>
+          <BrandLogo compact className="gap-2" textClassName="text-foreground" />
           <p className="text-sm text-muted-foreground">
             © 2026 ОКАК. Все права защищены.
           </p>

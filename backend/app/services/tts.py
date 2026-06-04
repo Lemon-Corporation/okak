@@ -4,6 +4,8 @@ import wave
 import tempfile
 import numpy as np
 import re
+import asyncio
+from functools import partial
 from piper.voice import PiperVoice
 from piper.config import SynthesisConfig
 
@@ -60,12 +62,9 @@ def preprocess_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-async def synthesize_speech(text: str) -> str:
-    """Synthesizes speech with advanced mathematical smoothing and prosody."""
+def _synthesize_sync(text: str, temp_path: str):
+    """Синхронная часть синтеза для запуска в экзекуторе."""
     voice = get_voice()
-    fd, temp_path = tempfile.mkstemp(suffix=".wav")
-    os.close(fd)
-    
     processed_text = preprocess_text(text)
     
     # Split into sentences to vary prosody (intonation)
@@ -119,3 +118,18 @@ async def synthesize_speech(text: str) -> str:
         wav_file.writeframes(int_samples.tobytes())
         
     return temp_path
+
+async def synthesize_speech(text: str) -> str:
+    """Synthesizes speech with advanced mathematical smoothing and prosody.
+    Runs in a thread pool to avoid blocking the event loop.
+    """
+    fd, temp_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, 
+        _synthesize_sync,
+        text,
+        temp_path
+    )

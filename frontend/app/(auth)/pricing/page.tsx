@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from '@/components/brand-mark'
 import {
   ArrowRight,
   Check,
-  FileText,
   Sparkles,
   Zap,
   Shield,
@@ -76,11 +76,8 @@ const plans = [
 
 function Brand() {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
-      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue text-white shadow-lg shadow-blue/25">
-        <FileText className="h-5 w-5" />
-      </div>
-      <span className="text-lg font-black tracking-tight text-foreground">ОКАК</span>
+    <Link href="/" className="block">
+      <BrandLogo />
     </Link>
   )
 }

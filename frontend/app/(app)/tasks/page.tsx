@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
+import { EmptyState } from '@/components/empty-state'
 import {
   Plus,
   Search,
@@ -788,23 +789,17 @@ export default function TasksPage() {
             <p className="text-sm">Загружаем задачи...</p>
           </div>
         ) : filteredTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <CheckSquare className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium text-foreground">
-              {searchQuery || filterStatus !== 'all' ? 'Задачи не найдены' : 'Нет задач'}
-            </h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {searchQuery || filterStatus !== 'all'
-                ? 'Попробуйте изменить фильтры'
-                : 'Создайте первую задачу, чтобы начать'}
-            </p>
-            {!searchQuery && filterStatus === 'all' && (
-              <Button onClick={handleOpenCreateTask}>
-                <Plus className="h-4 w-4" />
-                Создать задачу
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={CheckSquare}
+            title={searchQuery || filterStatus !== 'all' ? 'Задачи не найдены' : 'Нет задач'}
+            description={searchQuery || filterStatus !== 'all'
+              ? 'Попробуйте изменить поисковый запрос или фильтры по статусу.'
+              : 'Добавьте первую задачу, чтобы начать эффективно управлять своим временем.'
+            }
+            actionLabel="Создать задачу"
+            onAction={handleOpenCreateTask}
+            isSearch={isSearchMode || filterStatus !== 'all'}
+          />
         ) : isSearchMode ? (
           <div className="min-w-0 rounded-xl border bg-card">
             <div className="border-b px-4 py-3">

@@ -16,7 +16,7 @@ import type {
 } from './types'
 import { now } from './utils'
 import { authApi, projectsApi, notesApi, tasksApi, filesApi } from './api'
-import type { BackendProject, BackendNote, BackendTask } from './api/dto'
+import type { AuthResponse, BackendProject, BackendNote, BackendTask } from './api/dto'
 import { PROJECT_COLORS } from './utils'
 import { desktopBroadcast } from './electron'
 
@@ -90,6 +90,17 @@ function mapTask(t: BackendTask): Task {
   }
 }
 
+function mapUser(user: AuthResponse['user']): User {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.display_name,
+    avatar: null,
+    plan: (user.plan as 'free' | 'pro' | 'team') || 'free',
+    createdAt: user.created_at,
+  }
+}
+
 interface AppStore {
   // State
   user: User | null
@@ -107,7 +118,8 @@ interface AppStore {
   // Auth actions
   loadUser: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name: string) => Promise<void>
+  register: (email: string, password: string, name: string) => Promise<string>
+  completeAuth: (result: AuthResponse) => void
   logout: () => Promise<void>
   updateUser: (updates: Partial<User>) => void
 
@@ -191,36 +203,17 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
   login: async (email, password) => {
     const res = await authApi.login(email, password)
-
-    localStorage.setItem('okak_access_token', res.access_token)
-
-    const user: User = {
-      id: res.user.id,
-      email: res.user.email,
-      name: res.user.display_name,
-      avatar: null,
-      plan: (res.user.plan as 'free' | 'pro' | 'team') || 'free',
-      createdAt: res.user.created_at,
-    }
-
-    set({ user })
-    desktopBroadcast('app:auth-changed', { status: 'logged_in', user })
+    get().completeAuth(res)
   },
 
   register: async (email, password, name) => {
     const res = await authApi.register(email, password, name)
+    return res.email
+  },
 
-    localStorage.setItem('okak_access_token', res.access_token)
-
-    const user: User = {
-      id: res.user.id,
-      email: res.user.email,
-      name: res.user.display_name,
-      avatar: null,
-      plan: (res.user.plan as 'free' | 'pro' | 'team') || 'free',
-      createdAt: res.user.created_at,
-    }
-
+  completeAuth: (result) => {
+    localStorage.setItem('okak_access_token', result.access_token)
+    const user = mapUser(result.user)
     set({ user })
     desktopBroadcast('app:auth-changed', { status: 'logged_in', user })
   },

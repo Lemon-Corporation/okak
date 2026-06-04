@@ -4,15 +4,16 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { BrandMark } from '@/components/brand-mark'
 import { Input } from '@/components/ui/input'
 import { useAppStore } from '@/lib/store'
 import { ApiError } from '@/lib/api'
-import { desktopBroadcast } from '@/lib/electron'
-import { FileText, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 const errorMessages: Record<string, string> = {
   email_taken: 'Этот email уже зарегистрирован',
-  invalid_credentials: 'Проверьте email и пароль',
+  email_send_failed: 'Не удалось отправить письмо. Попробуйте ещё раз через минуту',
+  email_disabled: 'Почтовая отправка сейчас недоступна',
 }
 
 export default function RegisterPage() {
@@ -54,9 +55,8 @@ export default function RegisterPage() {
 
     setIsLoading(true)
     try {
-      await register(normalizedEmail, password, normalizedName)
-      desktopBroadcast('app:start-tour', { name: normalizedName })
-      router.push('/space')
+      const registeredEmail = await register(normalizedEmail, password, normalizedName)
+      router.push(`/verify-email?email=${encodeURIComponent(registeredEmail)}`)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(errorMessages[err.code] ?? err.message)
@@ -72,12 +72,10 @@ export default function RegisterPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-foreground">
-            <FileText className="h-6 w-6 text-background" />
-          </div>
+          <BrandMark className="mb-4" />
           <h1 className="text-2xl font-semibold text-foreground">Создать аккаунт</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Заполните форму для регистрации
+            Зарегистрируйтесь, потом подтвердите почту кодом из письма
           </p>
         </div>
 
@@ -177,6 +175,10 @@ export default function RegisterPage() {
             Посмотреть тарифы
           </Link>
         </div>
+
+        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
+          После подтверждения почты мы предложим скачать приложение, чтобы включить голосового помощника и виджет. В браузере тоже можно работать, но без голоса.
+        </p>
       </div>
     </div>
   )

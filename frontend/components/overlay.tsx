@@ -248,7 +248,7 @@ export function Overlay() {
   // Global keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.code === 'Space') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'Space') {
         e.preventDefault()
         setOverlayOpen(!isOverlayOpen)
       }

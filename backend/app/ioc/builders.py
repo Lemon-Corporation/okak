@@ -13,6 +13,7 @@ from app.repository.users import UserRepository
 from app.services.agents import AIAgentService, ProjectAgentService
 from app.services.ai_context import AIContextService
 from app.services.auth import AuthService
+from app.services.email import EmailService
 from app.services.files import FileService
 from app.services.notes import NoteService
 from app.services.projects import ProjectService
@@ -33,6 +34,7 @@ def build_container(*, settings: Settings, session: AsyncSession) -> AppContaine
     search_repository = SearchRepository(session=session)
     ai_context_repository = AIContextRepository(session=session)
     llm_client = LLMClient(settings=settings.llm)
+    email_service = EmailService(settings=settings.email)
     ai_context_service = AIContextService(
         ai_context_repository=ai_context_repository,
         llm_client=llm_client,
@@ -44,6 +46,7 @@ def build_container(*, settings: Settings, session: AsyncSession) -> AppContaine
     auth_service = AuthService(
         user_repository=user_repository,
         settings=settings.auth,
+        email_service=email_service,
     )
     project_service = ProjectService(
         project_repository=project_repository,
