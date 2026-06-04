@@ -1,6 +1,6 @@
 {
   "name": "okak",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "scripts": {
     "dev": "cd frontend && pnpm dev",

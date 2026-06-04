@@ -33,7 +33,7 @@ jobs:
       - name: Build DMG and PKG
         run: cd desktop && npx electron-builder --mac dmg pkg --publish never
 
-      - name: Publish to GitHub Releases
+      - name: Publish to okak-release
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop && npx electron-builder --mac dmg pkg --publish always
         env:
@@ -91,7 +91,7 @@ jobs:
           done
         continue-on-error: true
 
-      - name: Publish to GitHub Releases
+      - name: Publish to okak-release
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop; npx electron-builder --win nsis --publish always
         env:
@@ -127,7 +127,7 @@ jobs:
       - name: Build AppImage
         run: cd desktop && npx electron-builder --linux AppImage --publish never
 
-      - name: Publish to GitHub Releases
+      - name: Publish to okak-release
         if: startsWith(github.ref, 'refs/tags/v')
         run: cd desktop && npx electron-builder --linux AppImage --publish always
         env:
@@ -137,3 +137,27 @@ jobs:
         with:
           name: OKAK-linux
           path: desktop/release/*.AppImage
+
+  release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release on okak
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/OKAK-macos/*.dmg
+            artifacts/OKAK-macos/*.pkg
+            artifacts/OKAK-windows/*.exe
+            artifacts/OKAK-linux/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

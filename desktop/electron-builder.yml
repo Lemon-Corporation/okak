@@ -56,11 +56,7 @@ nsis:
   allowToChangeInstallationDirectory: true
 
 publish:
-  - provider: github
-    owner: Lemon-Corporation
-    repo: okak
-    releaseType: release
-  - provider: github
-    owner: Lemon-Corporation
-    repo: okak-release
-    releaseType: release
+  provider: github
+  owner: Lemon-Corporation
+  repo: okak-release
+  releaseType: release
