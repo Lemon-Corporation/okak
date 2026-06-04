@@ -80,8 +80,10 @@ cask "okak" do
 
   postflight do
     system_command "/usr/bin/xattr",
-                   args: ["-rd", "com.apple.quarantine", "#{appdir}/OKAK.app"],
+                   args: ["-d", "com.apple.quarantine", "#{appdir}/OKAK.app"],
                    sudo: false
+  rescue
+    # Ignore errors if quarantine is not present or command fails
   end
 
   zap trash: [
