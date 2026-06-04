@@ -161,3 +161,9 @@ jobs:
             artifacts/OKAK-linux/*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew Cask
+        run: |
+          chmod +x desktop/scripts/update-cask.sh
+          VERSION=${GITHUB_REF#refs/tags/v}
+          desktop/scripts/update-cask.sh "$VERSION" artifacts/OKAK-macos "${{ secrets.RELEASES_TOKEN }}"
