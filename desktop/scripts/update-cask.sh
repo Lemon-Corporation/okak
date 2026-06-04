@@ -78,6 +78,12 @@ cask "okak" do
 
   app "OKAK.app"
 
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-rd", "com.apple.quarantine", "#{appdir}/OKAK.app"],
+                   sudo: false
+  end
+
   zap trash: [
     "~/Library/Application Support/OKAK",
     "~/Library/Preferences/com.okak.app.plist",
