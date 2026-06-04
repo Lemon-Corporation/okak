@@ -36,6 +36,11 @@ export default function WidgetPage() {
   const dragBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const dragMovedRef = useRef(false)
   const dragRafRef = useRef<number | null>(null)
+  const onboardingStateRef = useRef({ isOnboarding: false, onboardingStep: 0 })
+
+  useEffect(() => {
+    onboardingStateRef.current = { isOnboarding, onboardingStep }
+  }, [isOnboarding, onboardingStep])
 
   const logToDebug = (message: string, data?: any) => {
     try {
@@ -46,6 +51,46 @@ export default function WidgetPage() {
       console.error('Logging failed', err);
     }
   };
+
+  const normalizeSpeech = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[.,!?;:«»"']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const matchesOnboardingStep = (step: number, text: string) => {
+    const normalized = normalizeSpeech(text)
+
+    if (step === 1) {
+      return (
+        (normalized.includes('созда') && normalized.includes('зада')) ||
+        (normalized.includes('купи') && normalized.includes('коф')) ||
+        (normalized.includes('добав') && normalized.includes('зада')) ||
+        normalized.includes('купить кофе')
+      )
+    }
+
+    if (step === 2) {
+      return (
+        (normalized.includes('откр') && normalized.includes('замет')) ||
+        normalized.includes('мои заметки') ||
+        normalized.includes('перейди в заметки')
+      )
+    }
+
+    return false
+  }
+
+  const retryOnboardingPrompt = async (step: number) => {
+    if (step === 1) {
+      await playTTS('Я не расслышал фразу. Повтори: Создай задачу купить кофе.')
+      startRecording()
+    } else if (step === 2) {
+      await playTTS('Повтори, пожалуйста: Открой мои заметки.')
+      startRecording()
+    }
+  }
 
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimeoutRef.current) {
@@ -95,6 +140,7 @@ export default function WidgetPage() {
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' })
         logToDebug('Recording stopped, blob size:', audioBlob.size)
+        const { isOnboarding: onboardingActive, onboardingStep: currentOnboardingStep } = onboardingStateRef.current
         
         if (audioBlob.size > 1000) {
           const formData = new FormData()
@@ -128,13 +174,23 @@ export default function WidgetPage() {
               if (text && text.trim()) {
                 setTranscript(text)
                 handleSendToAI(text)
+              } else if (onboardingActive) {
+                await retryOnboardingPrompt(currentOnboardingStep)
               }
             } else {
               logToDebug('STT failed:', res.status)
+              if (onboardingActive) {
+                await retryOnboardingPrompt(currentOnboardingStep)
+              }
             }
           } catch (err) {
             logToDebug('STT request error:', err)
+            if (onboardingActive) {
+              await retryOnboardingPrompt(currentOnboardingStep)
+            }
           }
+        } else if (onboardingActive) {
+          await retryOnboardingPrompt(currentOnboardingStep)
         }
         
         setIsRecording(false)
@@ -338,18 +394,18 @@ export default function WidgetPage() {
 
     if (isOnboarding) {
       setIsThinking(false)
-      const lower = text.toLowerCase()
-      if (onboardingStep === 1 && (lower.includes('задач') || lower.includes('кофе'))) {
+      if (matchesOnboardingStep(onboardingStep, text)) {
+        if (onboardingStep === 1) {
         setActiveAction('task')
-        setTimeout(() => setActiveAction(null), 2500)
-        await playTTS('Супер, задача добавлена!')
-        nextOnboardingStep()
-      } else if (onboardingStep === 2 && (lower.includes('заметк') || lower.includes('откр'))) {
-        await playTTS('Прекрасно, мы перешли в заметки!')
-        nextOnboardingStep()
+          setTimeout(() => setActiveAction(null), 2500)
+          await playTTS('Супер, задача добавлена!')
+          nextOnboardingStep()
+        } else if (onboardingStep === 2) {
+          await playTTS('Прекрасно, мы перешли в заметки!')
+          nextOnboardingStep()
+        }
       } else {
-        await playTTS('Я тебя не совсем понял, попробуй еще раз или скажи ту фразу, которую я просил.')
-        startRecording()
+        await retryOnboardingPrompt(onboardingStep)
       }
       return
     }

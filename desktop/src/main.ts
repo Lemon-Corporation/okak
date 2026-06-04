@@ -359,19 +359,45 @@ function clampWidgetBounds(bounds: WidgetBounds): WidgetBounds {
   }
 }
 
-function createWidgetWindow(): void {
-  log.info('[widget] creating widget window')
+function getDisplayForWidget(): Electron.Display {
+  return screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+}
+
+function getCollapsedWidgetBounds(display = getDisplayForWidget()): WidgetBounds {
   const size = 100
   const margin = 20
+  const { x, y, width } = display.workArea
 
-  const primaryDisplay = screen.getPrimaryDisplay()
-  const { width: screenWidth } = primaryDisplay.workAreaSize
-
-  widgetWindow = new BrowserWindow({
+  return {
+    x: x + width - size - margin,
+    y: y + margin,
     width: size,
     height: size,
-    x: screenWidth - size - margin,
-    y: margin,
+  }
+}
+
+function getCenteredWidgetBounds(display = getDisplayForWidget()): WidgetBounds {
+  const width = 450
+  const height = 160
+  const area = display.workArea
+
+  return {
+    x: area.x + Math.floor((area.width - width) / 2),
+    y: area.y + Math.floor((area.height - height) / 2),
+    width,
+    height,
+  }
+}
+
+function createWidgetWindow(): void {
+  log.info('[widget] creating widget window')
+  const initialBounds = getCollapsedWidgetBounds()
+
+  widgetWindow = new BrowserWindow({
+    width: initialBounds.width,
+    height: initialBounds.height,
+    x: initialBounds.x,
+    y: initialBounds.y,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -935,16 +961,7 @@ ipcMain.handle('app:resize-widget', (_event, expanded: boolean) => {
 
 ipcMain.handle('app:center-widget', () => {
   if (widgetWindow) {
-    const primaryDisplay = screen.getPrimaryDisplay()
-    const { width, height } = primaryDisplay.workAreaSize
-    const w = 450
-    const h = 160
-    widgetWindow.setBounds({
-      x: Math.floor((width - w) / 2),
-      y: Math.floor((height - h) / 2),
-      width: w,
-      height: h,
-    })
+    widgetWindow.setBounds(getCenteredWidgetBounds())
     widgetWindow.show()
     widgetWindow.focus()
   }
@@ -960,16 +977,7 @@ ipcMain.handle('app:complete-onboarding', () => {
   mainWindow?.focus()
   // Move widget to corner
   if (widgetWindow) {
-    const primaryDisplay = screen.getPrimaryDisplay()
-    const { width: screenWidth } = primaryDisplay.workAreaSize
-    const size = 100
-    const margin = 20
-    widgetWindow.setBounds({
-      x: screenWidth - size - margin,
-      y: margin,
-      width: size,
-      height: size
-    })
+    widgetWindow.setBounds(getCollapsedWidgetBounds())
   }
 })
 
